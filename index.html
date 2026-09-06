@@ -666,7 +666,27 @@ const searchUrl = q => 'https://www.google.com/maps/search/?api=1&query=' + enco
 const mapsUrl = ev => (ev.place && ev.place.url) || (ev.title ? searchUrl(ev.title + (ev.city ? ', ' + ev.city : '')) : '');
 const hasCoords = ev => !!(ev.place && typeof ev.place.lat === 'number' && typeof ev.place.lng === 'number');
 
-function mapsKey() { return LS.get(MAPS_KEY_LS) || DEFAULT_MAPS_KEY; }
+// The key and helper are built in; per-device overrides from earlier versions are cleared so nothing stale can shadow them.
+LS.set(MAPS_KEY_LS, null); LS.set(RESOLVER_LS, null);
+function mapsKey() { return DEFAULT_MAPS_KEY; }
+// Google reports why it refused a key only on the console, as a "...MapError" code. Catch it there and explain it in plain words.
+const MAP_ERRORS = {
+  RefererNotAllowedMapError: 'the key\'s website restriction does not include this page. In Google Cloud, Credentials, set Websites to https://katiemegli.github.io/*',
+  ApiNotActivatedMapError: 'the Maps JavaScript API is not enabled on the key\'s project',
+  BillingNotEnabledMapError: 'billing is not enabled on the key\'s project',
+  ApiTargetBlockedMapError: 'the key\'s API restrictions leave out the Maps JavaScript API',
+  InvalidKeyMapError: 'the key is not valid',
+  ExpiredKeyMapError: 'the key has expired',
+  ApiProjectMapError: 'the key\'s project is not set up for Maps',
+  DeletedApiProjectMapError: 'the key\'s project was deleted',
+  ProjectDeniedMapError: 'the key\'s project is not allowed to use this API',
+  OverQuotaMapError: 'the key is over its quota',
+};
+S.maps.code = '';
+(() => {
+  const orig = console.error.bind(console);
+  console.error = (...a) => { const m = a.map(String).join(' ').match(/\b(\w+MapError)\b/); if (m) { S.maps.code = m[1]; if (S.maps.state !== 'ready') { S.maps.error = `Google refused the key: ${MAP_ERRORS[m[1]] || m[1]}.`; setStatus(); } } orig(...a); };
+})();
 function loadMaps() {
   const key = mapsKey();
   if (!key) { S.maps.state = 'off'; return Promise.resolve(false); }
@@ -676,7 +696,7 @@ function loadMaps() {
   S.maps.promise = new Promise(res => {
     const done = ok => { S.maps.state = ok ? 'ready' : 'failed'; S.maps.promise = null; res(ok); scheduleAuto(); setStatus(); }; // a blocked script is silent; only Google's own refusals are shown
     window.__bomMapsReady = () => done(true);
-    window.gm_authFailure = () => { S.maps.error = 'Google rejected this API key.'; done(false); };
+    window.gm_authFailure = () => { S.maps.error = S.maps.code ? `Google refused the key: ${MAP_ERRORS[S.maps.code] || S.maps.code}.` : 'Google rejected this API key.'; done(false); setTimeout(setStatus, 500); };
     const sc = document.createElement('script');
     sc.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&loading=async&callback=__bomMapsReady';
     sc.async = true; sc.onerror = () => done(false);
@@ -725,7 +745,7 @@ async function nearbyPlace(lat, lng) {
     return { name: p.displayName, address: p.formattedAddress || '', placeId: p.id || '' };
   } catch (e) { console.warn(e); return null; }
 }
-const resolverUrl = () => LS.get(RESOLVER_LS) || DEFAULT_RESOLVER_URL;
+const resolverUrl = () => DEFAULT_RESOLVER_URL;
 /* Load the helper through a <script> tag instead of fetch, which sidesteps cross-origin rules entirely. */
 function jsonp(url) {
   return new Promise((res, rej) => {
@@ -1553,16 +1573,11 @@ function settingsDialog() {
   const addCat = el('button', { class: 'btn', onclick: () => { t.categories.push({ id: uid(), name: 'New category', emoji: '✨', h: Math.floor(Math.random() * 360), sortTime: '' }); save(); renderCats(); list.lastChild.children[1].focus(); list.lastChild.children[1].select(); } }, icon('plus'), 'Add category');
 
   // Google Maps key lives on this device only, never in the shared trip.
-  const mapsStatus = el('span', { class: 'hint' });
-  const paintMaps = () => {
-    const k = mapsKey();
-    mapsStatus.textContent = !k ? (osmOk() ? 'No key: addresses and routes come from OpenStreetMap (no subway times).' : 'No key: links still save the pin, and travel times are estimated from pins.')
-      : S.maps.state === 'ready' ? 'Connected. Names look up addresses and travel times come from Google directions.'
-      : S.maps.state === 'loading' ? 'Connecting…'
-      : (S.maps.error || 'Google Maps could not load here.') + ' Travel times fall back to estimates.';
-  };
-  paintMaps();
-  const keyInp = el('input', { type: 'password', value: LS.get(MAPS_KEY_LS) || '', placeholder: DEFAULT_MAPS_KEY ? 'Using the built-in key. Paste one to override on this device.' : 'AIza…', autocomplete: 'off', onchange: e => { LS.set(MAPS_KEY_LS, e.target.value.trim() || null); S.maps.state = 'off'; S.maps.error = ''; paintMaps(); loadMaps().then(paintMaps); } });
+  const mapsStatus = el('span', { class: 'hint' },
+    S.maps.state === 'ready' ? 'Google Maps is connected. Names look up addresses, the place field suggests matches as you type, and travel times come from Google directions.'
+    : S.maps.state === 'loading' ? 'Connecting to Google Maps…'
+    : S.maps.error ? S.maps.error + ' Until then, addresses come from OpenStreetMap and travel times are routed there or estimated.'
+    : (osmOk() ? 'Google Maps could not load on this page. Addresses come from OpenStreetMap and travel times are routed there.' : 'Google Maps could not load on this page. Travel times are estimated from pins.'));
   const d = dialog([
     el('h2', {}, 'Trip settings'),
     el('div', { class: 'field' }, el('label', {}, 'Trip name'), name),
@@ -1571,12 +1586,8 @@ function settingsDialog() {
     el('div', { class: 'field' }, el('label', {}, 'Stays'), el('span', { class: 'hint' }, 'Where you are on which dates. Days on the board follow from these, and place searches look in that day\'s city. A day that ends one stay and starts the next is a travel day.'), stays, el('div', {}, addStay)),
     el('div', { class: 'field' }, el('label', {}, 'Cities'), cities, el('span', { class: 'hint' }, 'Filled in from the stays. Add extra cities here if you like.')),
     el('div', { class: 'field' }, el('label', {}, 'Categories'), el('span', { class: 'hint' }, 'Top to bottom is also the order for cards that have no time.'), list, el('div', {}, addCat)),
-    el('div', { class: 'field' }, el('label', {}, 'Google Maps API key'), keyInp, mapsStatus,
-      el('span', { class: 'hint' }, 'Enable the Maps JavaScript, Places (New), Directions and Geocoding APIs for the key, and restrict it to this site.')),
-    el('div', { class: 'field' }, el('label', {}, 'Short-link helper URL'),
-      el('input', { value: LS.get(RESOLVER_LS) || '', placeholder: DEFAULT_RESOLVER_URL ? 'Using the built-in helper. Paste one to override on this device.' : 'https://script.google.com/macros/s/…/exec', autocomplete: 'off',
-        onchange: e => LS.set(RESOLVER_LS, e.target.value.trim() || null) }),
-      el('span', { class: 'hint' }, 'Lets a pasted maps.app.goo.gl link fill in the place name by itself. Set up with resolver.gs from the repository.')),
+    el('div', { class: 'field' }, el('label', {}, 'Google Maps'), mapsStatus,
+      el('span', { class: 'hint' }, 'Directions between two located cards are searched automatically whenever a card is added, moved, or given a place. The Google key and the short-link helper are built into the board.')),
     el('div', { class: 'dlg-actions' },
       el('button', { class: 'btn danger', style: 'margin-right:auto', onclick: () => {
         if (confirm(`Delete the trip “${t.name}” and all of its cards? This cannot be undone.`)) {

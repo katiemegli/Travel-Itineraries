@@ -18,13 +18,21 @@ Submitting creates one card. Cards sort by date, then time. A card without a tim
 
 ## Travel time between cards
 
-The row between two cards shows how long it takes to get from the card above to the one below. It is computed automatically when both cards have a map pin:
+The row between two cards shows how long it takes to get from the card above to the one below. It is computed automatically when both cards have a map pin, from the best source available:
 
-- With a Google Maps API key, directions come from Google. Walking under 35 minutes shows as a walk, otherwise transit under 45 minutes shows as subway, otherwise driving shows as car.
-- Without a key, the time is estimated from the straight-line distance between the two pins and marked with a tilde. Walks under 35 minutes show as a walk, anything farther shows as car.
-- You can override any row by hand from the card's Transportation field.
+1. **Google Maps directions**, when a Google Maps API key is set. Walking under 35 minutes shows as a walk, otherwise transit under 45 minutes shows as subway, otherwise driving shows as car.
+2. **OpenStreetMap routing** (no key needed) when the page can reach the internet. Walking under 35 minutes shows as a walk, otherwise driving shows as car. OpenStreetMap has no transit times, so subway never appears without a Google key.
+3. **A straight-line estimate** between the two pins, marked with a tilde, when neither service is reachable. This is what the hosted Claude artifact shows, because it blocks outside requests.
 
-The API key is entered in trip settings and stays on that device. Enable the Maps JavaScript, Places (New), Directions and Geocoding APIs for it, and restrict it to your site. The hosted Claude artifact blocks Google's script, so it always uses the estimate.
+Any row can be overridden by hand from the card's Transportation field.
+
+Place names are looked up the same way: Google Places with a key, OpenStreetMap (Nominatim) without one, and a full Google Maps link always saves the name and pin on its own.
+
+The API key is entered in trip settings and stays on that device. Enable the Maps JavaScript, Places (New), Directions and Geocoding APIs for it, and restrict it to your site.
+
+## Hosting
+
+A GitHub Actions workflow deploys the board to GitHub Pages on every push to the default branch. Once Pages is enabled for the repository, the board lives at `https://<owner>.github.io/Travel-Itineraries/`, where Google's script can load and the full workflow above applies.
 
 ## Other card properties
 
@@ -33,7 +41,7 @@ Icon, archive (hides the card, with an Archived filter to show them again), rati
 ## Where changes are saved
 
 - Opened as a plain file or from GitHub Pages, the board saves to the browser's local storage on that device.
-- Published as a Claude artifact with the `db` capability, the same file saves to a shared database, so everyone on the trip sees the same board live.
+- Published as a Claude artifact with the `db` capability, the same file saves to a shared database, so everyone on the trip sees the same board live. That host blocks outside requests, so travel times there are estimates.
 
 ## First run
 

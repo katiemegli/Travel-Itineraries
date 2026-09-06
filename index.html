@@ -416,6 +416,7 @@ const S = {
   editingId: null, unsubEvents: null,
   savingCount: 0, lastError: null,
   maps: { state: 'off', error: '', promise: null }, // off | loading | ready | failed
+  osm: { state: 'unknown' }, // unknown | ok | blocked  (the hosted artifact blocks outside requests)
   autoBusy: false, autoAgain: false,
 };
 const trip = () => S.trips[S.tripId];
@@ -623,19 +624,75 @@ async function resolveQuery(text, city) {
   if (link) {
     const place = { name: link.name, address: '', lat: link.lat, lng: link.lng, url: link.url, placeId: '', source: 'link' };
     if (link.short) return { title: '', place, needsName: true };
-    if (mapsReady()) {
-      try {
+    try {
+      if (mapsReady()) {
         if (link.name) { const p = await lookupPlace(link.name, city); if (p) { place.address = p.address; place.placeId = p.placeId; if (place.lat == null) { place.lat = p.lat; place.lng = p.lng; } } }
         else if (place.lat != null) place.address = await reverseAddress(place.lat, place.lng);
-      } catch (e) { console.warn(e); }
-    }
+      } else if (osmOk()) {
+        if (place.lat != null) place.address = await osmReverse(place.lat, place.lng);
+        else if (link.name) { const p = await osmLookup(link.name, city); if (p) { place.address = p.address; place.lat = p.lat; place.lng = p.lng; } }
+      }
+    } catch (e) { console.warn(e); }
     return { title: link.name, place };
   }
   if (mapsReady()) {
     try { const p = await lookupPlace(text, city); if (p) return { title: text, place: p }; }
     catch (e) { console.warn(e); S.maps.error = 'Place lookup failed: ' + (e.message || e); }
+  } else if (osmOk()) {
+    try { const p = await osmLookup(text, city); if (p) return { title: text, place: p }; } catch (e) { console.warn(e); }
   }
   return { title: text, place: null };
+}
+
+/* ---- key-free fallback: OpenStreetMap (Nominatim for places, OSRM for routes) ---- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const osmOk = () => S.osm.state !== 'blocked';
+async function osmFetch(url) {
+  if (!osmOk()) return null;
+  try {
+    const r = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!r.ok) return null;
+    S.osm.state = 'ok';
+    return await r.json();
+  } catch (e) { S.osm.state = 'blocked'; return null; } // network blocked here: stop asking
+}
+const nomQueue = []; let nomBusy = false; // Nominatim asks for at most one request per second
+function nominatim(path) { return new Promise((res, rej) => { nomQueue.push({ path, res, rej }); pumpNominatim(); }); }
+async function pumpNominatim() {
+  if (nomBusy) return; nomBusy = true;
+  while (nomQueue.length) { const j = nomQueue.shift(); try { j.res(await osmFetch('https://nominatim.openstreetmap.org/' + j.path)); } catch (e) { j.rej(e); } await sleep(1100); }
+  nomBusy = false;
+}
+const shortAddress = (display, name) => {
+  const parts = String(display || '').split(', ').filter(Boolean);
+  if (name && parts[0] && parts[0].toLowerCase() === String(name).toLowerCase()) parts.shift();
+  return parts.slice(0, 4).join(', ');
+};
+async function osmLookup(query, city) {
+  const q = city && !query.toLowerCase().includes(city.toLowerCase()) ? `${query}, ${city}` : query;
+  const rows = await nominatim('search?format=jsonv2&limit=1&addressdetails=0&q=' + encodeURIComponent(q));
+  const r = Array.isArray(rows) && rows[0]; if (!r || r.lat == null) return null;
+  return { name: r.name || query, address: shortAddress(r.display_name, r.name), lat: +r.lat, lng: +r.lon, url: searchUrl(query), placeId: '', source: 'osm' };
+}
+async function osmReverse(lat, lng) {
+  const r = await nominatim(`reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
+  return r && r.display_name ? shortAddress(r.display_name, r.name) : '';
+}
+const osrmCache = new Map();
+async function osrmRoute(a, b, profile) {
+  const k = `${profile}:${a.place.lng},${a.place.lat};${b.place.lng},${b.place.lat}`;
+  if (osrmCache.has(k)) return osrmCache.get(k);
+  const r = await osmFetch(`https://router.project-osrm.org/route/v1/${profile}/${a.place.lng},${a.place.lat};${b.place.lng},${b.place.lat}?overview=false`);
+  const route = r && r.code === 'Ok' && r.routes && r.routes[0];
+  const out = route ? { mins: Math.max(1, Math.round(route.duration / 60)), meters: route.distance } : null;
+  osrmCache.set(k, out); return out;
+}
+async function osmPair(a, b) {
+  const drive = await osrmRoute(a, b, 'driving'); if (!drive) return null;
+  const foot = await osrmRoute(a, b, 'foot');
+  const walk = foot ? foot.mins : Math.round(drive.meters / 80); // walking pace over the road distance
+  if (walk < WALK_MAX) return { mode: 'walk', mins: walk, src: 'osm' };
+  return { mode: 'drive', mins: drive.mins + 3, src: 'osm' };
 }
 
 /* ---- transport between consecutive cards ---- */
@@ -688,15 +745,20 @@ async function updateAutoTransport() {
         const b = evs[i], a = evs[i - 1];
         const key = a ? pairKey(a, b) : '';
         if (!key) { if (b.auto) patchEvent(b.id, { auto: null }, { immediate: true }); continue; }
-        if (b.auto && b.auto.key === key && !(b.auto.est && mapsReady())) continue;
+        const available = mapsReady() ? 2 : osmOk() ? 1 : 0; // google > openstreetmap > straight-line estimate
+        if (b.auto && b.auto.key === key && (b.auto.rank || 0) >= available) continue;
         let r = null;
         if (mapsReady()) { try { r = await googlePair(a, b); } catch (e) { console.warn(e); } }
-        if (!r) r = estimatePair(a, b);
+        if (r) r.rank = 2;
+        if (!r && osmOk()) { try { r = await osmPair(a, b); } catch (e) { console.warn(e); } if (r) r.rank = 1; }
+        if (!r) r = { ...estimatePair(a, b), rank: 0 };
+        if (b.auto && b.auto.key === key && b.auto.rank === r.rank && b.auto.mode === r.mode && b.auto.mins === r.mins) continue;
         patchEvent(b.id, { auto: { key, ...r, at: Date.now() } }, { immediate: true });
       }
     }
   } finally { S.autoBusy = false; if (S.autoAgain) { S.autoAgain = false; scheduleAuto(); } }
 }
+const autoWhy = a => a.est ? 'Estimated from the straight-line distance between the two pins. Add a Google Maps key in trip settings for real directions.' : a.src === 'osm' ? 'Routed on OpenStreetMap. Add a Google Maps key in trip settings for Google directions and subway times.' : 'Google Maps directions';
 const effectiveTransport = ev => (ev.transport && (ev.transport.mins || ev.transport.mode)) ? { ...ev.transport, manual: true } : (ev.auto && ev.auto.mode ? ev.auto : null);
 
 /* ================= render: top ================= */
@@ -783,7 +845,7 @@ function renderLink(ev, first) {
   if (!tr && first) return el('div', { class: 'gap' });
   const link = el('div', { class: 'link' + (tr ? '' : ' empty') }, el('div', { class: 'line' }));
   if (tr) link.append(transportChip(tr, { onclick: e => { e.stopPropagation(); openEditor(ev.id, { focus: 'transport' }); }, role: 'button', tabindex: '0',
-    title: tr.manual ? 'Entered by hand' : (tr.est ? 'Estimated from the two map pins. Add a Google Maps key in trip settings for real directions.' : 'From Google Maps directions') }));
+    title: tr.manual ? 'Entered by hand' : autoWhy(tr) }));
   else link.append(el('button', { class: 'addtr', onclick: () => openEditor(ev.id, { focus: 'transport' }) }, hasCoords(ev) ? '+ add a location to the card above for directions' : '+ add a location for directions'));
   return link;
 }
@@ -892,7 +954,7 @@ function autosize(ta) { ta.style.height = 'auto'; ta.style.height = Math.max(38,
 function placeLine(place, { busy, needsName, onClear } = {}) {
   const line = el('div', { class: 'place-line' + (busy ? ' busy' : '') + (needsName ? ' warn' : '') });
   if (busy) { line.append('Looking up…'); return line; }
-  if (!place) { line.append(S.maps.state === 'ready' ? 'Address will be filled in from Google Maps' : 'Paste a Google Maps link to save the pin'); return line; }
+  if (!place) { line.append(S.maps.state === 'ready' ? 'Address will be filled in from Google Maps' : osmOk() ? 'Address will be looked up when you leave this field' : 'Paste a Google Maps link to save the pin'); return line; }
   line.append('📍', el('span', { class: 'addr' }, needsName ? 'Short link saved. Type the place name above.' : (place.address || (place.lat != null ? 'Pin saved from the link' : 'Link saved'))));
   if (onClear) line.append(el('button', { type: 'button', class: 'clr', title: 'Forget this location', 'aria-label': 'Forget this location', onclick: onClear }, '✕'));
   return line;
@@ -925,7 +987,7 @@ function placeField(state, city, onChange, { placeholder } = {}) {
 function reservationField(state, onChange) {
   const box = el('div');
   const details = el('input', { value: state.reservation || '', placeholder: 'Reservation details, e.g. book on Resy 2 weeks ahead', style: 'margin-top:8px', oninput: e => { state.reservation = e.target.value; onChange('text'); } });
-  const paintDetails = () => { details.placeholder = state.booked ? 'Booking details, e.g. 7:30 for 2, under Katie' : 'Reservation details, e.g. book on Resy 2 weeks ahead'; };
+  const paintDetails = () => { details.hidden = !!state.booked; };
   const seg = segmented([{ value: 'yes', label: '✓ Booked' }, { value: 'no', label: 'Not booked' }], state.booked ? 'yes' : 'no', v => { state.booked = v === 'yes'; paintDetails(); onChange('toggle'); });
   paintDetails();
   box.append(seg, details);
@@ -1052,7 +1114,7 @@ function renderEditor() {
   const tr = ev.transport || { mins: null, mode: '' };
   const manual = !!(tr.mins || tr.mode);
   const autoLine = el('div', { class: 'auto-line', id: 'f-transport' });
-  if (ev.auto && ev.auto.mode) autoLine.append(transportChip(ev.auto), el('span', { class: 'why' }, ev.auto.est ? 'estimated from the two map pins' : 'Google Maps directions'), manual && el('span', { class: 'why' }, '· overridden below'));
+  if (ev.auto && ev.auto.mode) autoLine.append(transportChip(ev.auto), el('span', { class: 'why' }, ev.auto.est ? 'estimated from the two map pins' : ev.auto.src === 'osm' ? 'OpenStreetMap route' : 'Google Maps directions'), manual && el('span', { class: 'why' }, '· overridden below'));
   else if (!hasCoords(ev)) autoLine.append(el('span', { class: 'why' }, 'Add a Google Maps link to this card and the one before it to get the travel time here.'));
   else autoLine.append(el('span', { class: 'why' }, 'Waiting for a located card before this one.'));
   const mins = el('input', { type: 'number', min: 0, step: 1, inputmode: 'numeric', placeholder: 'min', value: tr.mins ?? '',
@@ -1194,7 +1256,7 @@ function settingsDialog() {
   const mapsStatus = el('span', { class: 'hint' });
   const paintMaps = () => {
     const k = mapsKey();
-    mapsStatus.textContent = !k ? 'No key: links still save the pin, and travel times are estimated from pins.'
+    mapsStatus.textContent = !k ? (osmOk() ? 'No key: addresses and routes come from OpenStreetMap (no subway times).' : 'No key: links still save the pin, and travel times are estimated from pins.')
       : S.maps.state === 'ready' ? 'Connected. Names look up addresses and travel times come from Google directions.'
       : S.maps.state === 'loading' ? 'Connecting…'
       : (S.maps.error || 'Google Maps could not load here.') + ' Travel times fall back to estimates.';

@@ -135,7 +135,7 @@ a{color:inherit}
 .link .chip.est{color:var(--muted)}
 .link .chip[role="button"],.link a.chip{cursor:pointer;text-decoration:none}
 .link .chip[role="button"]:hover,.link a.chip:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
-.link .addtr{color:var(--icon-idle);font-size:14px;opacity:0;padding:0;border-radius:0;text-align:left}
+.link .addtr{color:var(--icon-idle);font-size:14px;opacity:1;padding:0;border-radius:0;text-align:left}
 .link:hover .addtr,.link:focus-within .addtr{opacity:1;color:var(--muted)}
 .gap{height:0}
 @media (hover:none){.link .addtr{opacity:1}}
@@ -189,6 +189,11 @@ a{color:inherit}
 .seg{display:flex;flex-wrap:wrap;gap:var(--sp-sm)}
 .seg button{border:0;background:var(--panel-2);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:500;color:var(--ink);display:inline-flex;gap:5px;align-items:center;text-transform:capitalize}
 .seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.suggest-wrap{position:relative}
+.suggest{position:absolute;left:0;right:0;top:calc(100% - 18px);background:var(--bg);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);z-index:60;max-height:264px;overflow-y:auto;padding:4px}
+.suggest button{display:block;width:100%;text-align:left;padding:9px 12px;border-radius:6px;font-size:15px;line-height:1.3}
+.suggest button .sec{display:block;font-size:13px;color:var(--muted)}
+.suggest button[aria-selected="true"],.suggest button:hover{background:var(--panel-2)}
 .place-line{display:flex;gap:6px;align-items:flex-start;font-size:13px;color:var(--muted);margin-top:6px;min-height:16px;line-height:1.4}
 .place-line .addr{flex:1;min-width:0;overflow-wrap:anywhere}
 .place-line .clr{color:var(--muted);padding:0 4px;border-radius:4px}
@@ -461,6 +466,7 @@ function setStatus() {
   s.className = 'status';
   const where = S.backend === 'shared' ? 'shared with your trip' : 'saved on this device';
   if (S.lastError) { s.classList.add('err'); s.querySelector('.txt').textContent = S.lastError; s.title = S.lastError; return; }
+  if (S.maps.error) { s.classList.add('err'); s.querySelector('.txt').textContent = 'Maps: ' + S.maps.error; s.title = S.maps.error + ' Check the key in trip settings.'; return; }
   if (S.savingCount > 0) { s.classList.add('busy'); s.querySelector('.txt').textContent = 'Saving…'; }
   else { s.classList.add('ok'); s.querySelector('.txt').textContent = S.backend === 'shared' ? 'Synced' : 'Saved'; }
   s.title = `Changes are ${where} automatically`;
@@ -807,11 +813,24 @@ async function googlePair(a, b) {
 const pairKey = (a, b) => hasCoords(a) && hasCoords(b) ? `${a.place.lat.toFixed(5)},${a.place.lng.toFixed(5)}>${b.place.lat.toFixed(5)},${b.place.lng.toFixed(5)}` : '';
 let autoTimer = 0;
 function scheduleAuto() { clearTimeout(autoTimer); autoTimer = setTimeout(updateAutoTransport, 600); }
+/* Cards typed in before Google finished loading, or whose lookup failed, get located by name in the background.
+   Only a result that shares a meaningful word with the card's title is accepted, so vague titles never get a random pin. */
+const STOP = new Set(['the', 'and', 'for', 'with', 'hotel', 'lunch', 'dinner', 'bar', 'cafe', 'restaurant', 'get', 'ready', 'relax', 'walk', 'day', 'night', 'morning', 'evening', 'time', 'free', 'trip', 'arrive', 'depart', 'check', 'flight', 'train', 'airport']);
+const words = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(w => w.length >= 3 && !STOP.has(w));
+const looksLike = (title, found) => { const a = words(title), b = new Set(words(found)); return a.length > 0 && a.some(w => b.has(w)); };
+async function autoLocate(ev, t) {
+  if (!mapsReady() || !ev.title || ev.place || (ev.located && ev.located.v === 1)) return;
+  let place = null;
+  try { const p = await lookupPlace(ev.title, ev.city || t.cities[0] || ''); if (p && looksLike(ev.title, p.name)) place = p; }
+  catch (e) { console.warn(e); return; } // leave untried so it retries after a transient failure
+  patchEvent(ev.id, { located: { v: 1, at: Date.now(), ok: !!place }, ...(place ? { place } : {}) }, { immediate: true });
+}
 async function updateAutoTransport() {
   if (S.autoBusy) { S.autoAgain = true; return; }
   S.autoBusy = true;
   try {
     const t = trip(); if (!t) return;
+    if (mapsReady()) for (const ev of Object.values(S.events)) if (!ev.archived) await autoLocate(ev, t);
     for (const date of [...t.days, '']) {
       const evs = dayEvents(date, { all: true });
       for (let i = 0; i < evs.length; i++) {
@@ -933,7 +952,11 @@ function renderLink(ev, first, prev) {
   if (tr && dir) link.append(transportChip(tr, { href: dir, target: '_blank', rel: 'noopener', title: (tr.manual ? 'Entered by hand' : autoWhy(tr)) + ' · opens directions in Google Maps' }, 'a'));
   else if (tr) link.append(transportChip(tr, { onclick: e => { e.stopPropagation(); openEditor(ev.id, { focus: 'transport' }); }, role: 'button', tabindex: '0',
     title: tr.manual ? 'Entered by hand' : autoWhy(tr) }));
-  else link.append(el('button', { class: 'addtr', onclick: () => openEditor(ev.id, { focus: 'transport' }) }, hasCoords(ev) ? '+ add a location to the card above for directions' : '+ add a location for directions'));
+  else {
+    const missing = !hasCoords(ev) ? ev : prev;
+    const label = !hasCoords(ev) && prev && !hasCoords(prev) ? 'No locations yet' : `No location for ${(missing && missing.title) || 'this card'}`;
+    link.append(el('button', { class: 'addtr', title: 'Open the card and paste its Google Maps link', onclick: () => openEditor((missing || ev).id, { focus: 'place' }) }, label));
+  }
   return link;
 }
 function transportChip(tr, attrs = {}, tag = 'span') {
@@ -1038,7 +1061,7 @@ function autosize(ta) { ta.style.height = 'auto'; ta.style.height = Math.max(38,
 function placeLine(place, { busy, needsName, onClear } = {}) {
   const line = el('div', { class: 'place-line' + (busy ? ' busy' : '') + (needsName ? ' warn' : '') });
   if (busy) { line.append('Looking up…'); return line; }
-  if (!place) { line.append(S.maps.state === 'ready' ? 'Address will be filled in from Google Maps' : osmOk() ? 'Address will be looked up when you leave this field' : 'Paste a Google Maps link to save the pin'); return line; }
+  if (!place) { line.append('No location yet. ' + (S.maps.state === 'ready' ? 'Type the place name or paste its Google Maps link.' : osmOk() ? 'The address is looked up when you leave this field.' : 'Paste a Google Maps link to save the pin.')); return line; }
   line.append('📍', el('span', { class: 'addr' }, needsName ? 'Short link saved. Type the place name above.' + (S.resolverNote ? ' (' + S.resolverNote + ')' : '') : (place.address || (place.lat != null ? 'Pin saved from the link' : 'Link saved'))));
   if (onClear) line.append(el('button', { type: 'button', class: 'clr', title: 'Forget this location', 'aria-label': 'Forget this location', onclick: onClear }, '✕'));
   return line;
@@ -1071,15 +1094,85 @@ function placeField(state, city, onChange, { placeholder } = {}) {
     state.title = r.title || (r.needsName ? '' : v); state.place = r.place;
     inp.value = state.title; redraw(); onChange();
   };
+  // Google Places suggestions while typing a name. One session token per search keeps Google's billing to a single session.
+  const list = el('div', { class: 'suggest', role: 'listbox', hidden: true });
+  let token = null, sugTimer = 0, preds = [], sugIdx = -1;
+  const hideSug = () => { list.hidden = true; list.replaceChildren(); preds = []; sugIdx = -1; };
+  const paintSug = () => list.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-selected', String(i === sugIdx)));
+  const choose = async pred => {
+    hideSug(); state.busy = true; redraw();
+    const p = state.promise = (async () => {
+      const place = pred.toPlace();
+      await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location', 'googleMapsURI', 'id'] });
+      const name = place.displayName || (pred.mainText && pred.mainText.text) || inp.value.trim();
+      return { name, address: place.formattedAddress || (pred.secondaryText && pred.secondaryText.text) || '', lat: place.location ? place.location.lat() : null, lng: place.location ? place.location.lng() : null,
+        url: place.googleMapsURI || searchUrl(name), placeId: place.id || '', source: 'places' };
+    })();
+    let found = null; try { found = await p; } catch (e) { console.warn(e); S.maps.error = 'Place lookup failed: ' + (e.message || e); setStatus(); }
+    if (state.promise !== p) return;
+    token = null; state.busy = false; state.needsName = false;
+    if (found) { state.place = found; state.title = found.name; inp.value = found.name; }
+    redraw(); onChange();
+  };
+  const showSug = items => {
+    preds = items; sugIdx = -1; list.replaceChildren();
+    if (!items.length) { hideSug(); return; }
+    for (const pr of items) list.append(el('button', { type: 'button', role: 'option', 'aria-selected': 'false', onpointerdown: e => { e.preventDefault(); choose(pr); } },
+      el('span', { class: 'main' }, pr.mainText ? pr.mainText.text : pr.text.text), pr.secondaryText && el('span', { class: 'sec' }, pr.secondaryText.text)));
+    list.hidden = false;
+  };
+  const fetchSug = async q => {
+    if (!mapsReady()) return;
+    try {
+      const { AutocompleteSuggestion, AutocompleteSessionToken } = await google.maps.importLibrary('places');
+      token = token || new AutocompleteSessionToken();
+      const req = { input: q, sessionToken: token };
+      const bias = await tripBias(city); if (bias) req.locationBias = { center: bias, radius: 30000 };
+      const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions(req);
+      if (inp.value.trim() !== q) return; // typed more since
+      showSug((suggestions || []).map(s => s.placePrediction).filter(Boolean).slice(0, 6));
+    } catch (e) { console.warn(e); S.maps.error = 'Place search failed: ' + (e.message || e); setStatus(); }
+  };
   inp.addEventListener('change', run);
   inp.addEventListener('paste', e => {
     const clip = e.clipboardData ? e.clipboardData.getData('text') : '';
-    if (splitShare(clip)) { e.preventDefault(); inp.value = clip.replace(/\s+/g, ' ').trim(); run(); } // keep the shared name that sits on its own line
+    if (splitShare(clip)) { e.preventDefault(); inp.value = clip.replace(/\s+/g, ' ').trim(); hideSug(); run(); } // keep the shared name that sits on its own line
     else setTimeout(run, 0);
   });
-  inp.addEventListener('input', () => { state.title = inp.value; if (!splitShare(inp.value)) onChange(); });
-  box.append(inp, line); box.input = inp; box.run = run;
+  inp.addEventListener('input', () => {
+    state.title = inp.value;
+    const v = inp.value.trim();
+    clearTimeout(sugTimer);
+    if (splitShare(v)) { hideSug(); return; }
+    onChange();
+    if (v.length >= 2 && mapsReady()) sugTimer = setTimeout(() => fetchSug(v), 250); else hideSug();
+  });
+  inp.addEventListener('keydown', e => {
+    if (list.hidden) { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); sugIdx = (sugIdx + 1) % preds.length; paintSug(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); sugIdx = (sugIdx - 1 + preds.length) % preds.length; paintSug(); }
+    else if (e.key === 'Enter') { e.preventDefault(); choose(preds[sugIdx < 0 ? 0 : sugIdx]); }
+    else if (e.key === 'Escape') { e.stopPropagation(); hideSug(); }
+  });
+  inp.addEventListener('blur', () => setTimeout(hideSug, 200));
+  box.className = 'suggest-wrap';
+  box.append(inp, list, line); box.input = inp; box.run = run;
   return box;
+}
+/* Where to bias place searches: the middle of the trip's pinned cards, else the trip's first city, geocoded once. */
+S.biasCache = {};
+async function tripBias(city) {
+  const pinned = Object.values(S.events).filter(hasCoords);
+  if (pinned.length) return { lat: pinned.reduce((s, e) => s + e.place.lat, 0) / pinned.length, lng: pinned.reduce((s, e) => s + e.place.lng, 0) / pinned.length };
+  if (!city) return null;
+  if (S.biasCache[city] !== undefined) return S.biasCache[city];
+  try {
+    const { Geocoder } = await google.maps.importLibrary('geocoding');
+    const r = await new Geocoder().geocode({ address: city });
+    const loc = r.results && r.results[0] && r.results[0].geometry.location;
+    S.biasCache[city] = loc ? { lat: loc.lat(), lng: loc.lng() } : null;
+  } catch { S.biasCache[city] = null; }
+  return S.biasCache[city];
 }
 function reservationField(state, onChange) {
   const box = el('div');
@@ -1143,6 +1236,7 @@ function openEditor(id, opts = {}) {
   renderEditor();
   const ed = $('#editor');
   if (opts.focus === 'transport') setTimeout(() => { const f = $('#f-transport', ed); f && f.scrollIntoView({ block: 'center' }); }, 30);
+  if (opts.focus === 'place') setTimeout(() => { const f = $('#f-place input', ed); f && f.focus(); }, 30);
 }
 function closeEditor() {
   S.editingId = null; editorRendered = '';
@@ -1234,7 +1328,7 @@ function renderEditor() {
       el('button', { class: 'iconbtn', 'aria-label': 'Close', onclick: closeEditor }, icon('x'))),
     el('div', { class: 'ed-scroll' },
       el('div', { class: 'ed-hero' }, emojiBtn, title),
-      prop('pin', 'Place', pf, openLink),
+      prop('pin', 'Place', el('div', { id: 'f-place' }, pf), openLink),
       prop('tag', 'Category', catSeg),
       prop('cal', 'Date', date),
       prop('clock', 'Time', time),

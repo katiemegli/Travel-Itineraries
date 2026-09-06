@@ -368,6 +368,8 @@ const DEFAULT_CATEGORIES = [
 const LEGACY_CAT = { food: ev => (!ev.time || ev.time < '15:00') ? 'lunch' : 'dinner', drinks: 'bar', sights: 'activity', hotel: 'activity', transit: 'activity', rest: 'activity', shopping: 'activity' };
 const EMOJI = '🥪 🍜 🍣 🍛 🍕 🍔 🥐 🍰 🍦 ☕ 🍵 🍷 🍸 🍺 🥂 🍹 🏛️ 🏰 🗼 🗽 ⛩️ 🕌 🎡 🎢 🎨 🖼️ 🎭 🎶 🎫 🎟️ 🌺 🌸 🌳 🌊 🏖️ ⛰️ 🏞️ 🌅 🌃 🏙️ 🛍️ 👗 👚 💄 💅 🧖 🛀 🛏️ 🏨 🏠 🛬 🛫 ✈️ 🚆 🚇 🚌 🚕 ⛴️ 🚲 🐚 🐔 🍗 🥩 🦞 🦪 🐟 🧭 📸 🗺️ 🎁 💍 ❤️ ⭐'.split(' ');
 const MAPS_KEY_LS = 'bookshelf-of-memories/maps-key';
+// Browser key for Google Maps, restricted in Google Cloud to this site's address. A key entered in trip settings overrides it on that device.
+const DEFAULT_MAPS_KEY = 'AIzaSyDuTwpPsxAUJLDjZVlwW1O07VozqSjrlNg';
 
 /* ================= storage backends ================= */
 class LocalStore {
@@ -585,7 +587,7 @@ const searchUrl = q => 'https://www.google.com/maps/search/?api=1&query=' + enco
 const mapsUrl = ev => (ev.place && ev.place.url) || (ev.title ? searchUrl(ev.title + (ev.city ? ', ' + ev.city : '')) : '');
 const hasCoords = ev => !!(ev.place && typeof ev.place.lat === 'number' && typeof ev.place.lng === 'number');
 
-function mapsKey() { return LS.get(MAPS_KEY_LS) || ''; }
+function mapsKey() { return LS.get(MAPS_KEY_LS) || DEFAULT_MAPS_KEY; }
 function loadMaps() {
   const key = mapsKey();
   if (!key) { S.maps.state = 'off'; return Promise.resolve(false); }
@@ -1268,7 +1270,7 @@ function settingsDialog() {
       : (S.maps.error || 'Google Maps could not load here.') + ' Travel times fall back to estimates.';
   };
   paintMaps();
-  const keyInp = el('input', { type: 'password', value: mapsKey(), placeholder: 'AIza…', autocomplete: 'off', onchange: e => { LS.set(MAPS_KEY_LS, e.target.value.trim() || null); S.maps.state = 'off'; S.maps.error = ''; paintMaps(); loadMaps().then(paintMaps); } });
+  const keyInp = el('input', { type: 'password', value: LS.get(MAPS_KEY_LS) || '', placeholder: DEFAULT_MAPS_KEY ? 'Using the built-in key. Paste one to override on this device.' : 'AIza…', autocomplete: 'off', onchange: e => { LS.set(MAPS_KEY_LS, e.target.value.trim() || null); S.maps.state = 'off'; S.maps.error = ''; paintMaps(); loadMaps().then(paintMaps); } });
   const d = dialog([
     el('h2', {}, 'Trip settings'),
     el('div', { class: 'field' }, el('label', {}, 'Trip name'), name),
@@ -1276,7 +1278,7 @@ function settingsDialog() {
     el('div', { class: 'field' }, el('label', {}, 'Travelers'), trav, el('span', { class: 'hint' }, 'Comma-separated. Each traveler gets a notes field on every card.')),
     el('div', { class: 'field' }, el('label', {}, 'Cities'), cities, el('span', { class: 'hint' }, 'The first city narrows place lookups.')),
     el('div', { class: 'field' }, el('label', {}, 'Categories'), el('span', { class: 'hint' }, 'Top to bottom is also the order for cards that have no time.'), list, el('div', {}, addCat)),
-    el('div', { class: 'field' }, el('label', {}, 'Google Maps API key (this device only)'), keyInp, mapsStatus,
+    el('div', { class: 'field' }, el('label', {}, 'Google Maps API key'), keyInp, mapsStatus,
       el('span', { class: 'hint' }, 'Enable the Maps JavaScript, Places (New), Directions and Geocoding APIs for the key, and restrict it to this site.')),
     el('div', { class: 'dlg-actions' },
       el('button', { class: 'btn danger', style: 'margin-right:auto', onclick: () => {

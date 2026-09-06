@@ -640,14 +640,31 @@ async function nearbyPlace(lat, lng) {
   } catch (e) { console.warn(e); return null; }
 }
 const resolverUrl = () => LS.get(RESOLVER_LS) || DEFAULT_RESOLVER_URL;
+/* Load the helper through a <script> tag instead of fetch, which sidesteps cross-origin rules entirely. */
+function jsonp(url) {
+  return new Promise((res, rej) => {
+    const cb = '__bomCb' + Math.random().toString(36).slice(2);
+    const sc = document.createElement('script');
+    const cleanup = () => { delete window[cb]; sc.remove(); };
+    window[cb] = d => { cleanup(); res(d); };
+    sc.onerror = () => { cleanup(); rej(new Error('script failed')); };
+    sc.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cb;
+    document.head.append(sc);
+    setTimeout(() => { if (window[cb]) { cleanup(); rej(new Error('timeout')); } }, 12000);
+  });
+}
+S.resolverNote = '';
 async function expandShortLink(url) {
-  const base = resolverUrl(); if (!base || !osmOk()) return '';
-  try {
-    const r = await fetch(base + (base.includes('?') ? '&' : '?') + 'url=' + encodeURIComponent(url));
-    if (!r.ok) return '';
-    const j = await r.json();
-    return j && typeof j.url === 'string' && /^https?:\/\//.test(j.url) ? j.url : '';
-  } catch (e) { console.warn('short-link helper unreachable', e); return ''; }
+  const base = resolverUrl(); if (!base) { S.resolverNote = 'No short-link helper set.'; return ''; }
+  const q = base + (base.includes('?') ? '&' : '?') + 'url=' + encodeURIComponent(url);
+  let j = null, how = '';
+  try { const r = await fetch(q); if (r.ok) { j = await r.json(); how = 'fetch'; } else S.resolverNote = `Helper answered ${r.status}.`; }
+  catch (e) { console.warn('helper via fetch failed', e); }
+  if (!j) { try { j = await jsonp(q); how = 'script'; } catch (e) { console.warn('helper via script failed', e); S.resolverNote = S.resolverNote || 'Helper did not answer.'; return ''; } }
+  const full = j && typeof j.url === 'string' && /^https?:\/\//.test(j.url) ? j.url : '';
+  S.resolverNote = full ? '' : `Helper (${how}) returned no link` + (j && j.error ? `: ${j.error}` : '.');
+  if (full) { const p = parseMapsLink(full); if (p && !p.name && p.lat == null) S.resolverNote = 'Helper returned ' + full.slice(0, 80) + '…'; }
+  return full;
 }
 /* Google's Share button copies "Place name" + a short link together; pull the two apart. */
 function splitShare(text) {
@@ -1012,7 +1029,7 @@ function placeLine(place, { busy, needsName, onClear } = {}) {
   const line = el('div', { class: 'place-line' + (busy ? ' busy' : '') + (needsName ? ' warn' : '') });
   if (busy) { line.append('Looking up…'); return line; }
   if (!place) { line.append(S.maps.state === 'ready' ? 'Address will be filled in from Google Maps' : osmOk() ? 'Address will be looked up when you leave this field' : 'Paste a Google Maps link to save the pin'); return line; }
-  line.append('📍', el('span', { class: 'addr' }, needsName ? 'Short link saved. Type the place name above.' : (place.address || (place.lat != null ? 'Pin saved from the link' : 'Link saved'))));
+  line.append('📍', el('span', { class: 'addr' }, needsName ? 'Short link saved. Type the place name above.' + (S.resolverNote ? ' (' + S.resolverNote + ')' : '') : (place.address || (place.lat != null ? 'Pin saved from the link' : 'Link saved'))));
   if (onClear) line.append(el('button', { type: 'button', class: 'clr', title: 'Forget this location', 'aria-label': 'Forget this location', onclick: onClear }, '✕'));
   return line;
 }

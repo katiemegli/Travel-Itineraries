@@ -21,12 +21,20 @@
  */
 function doGet(e) {
   var url = e && e.parameter && e.parameter.url ? String(e.parameter.url) : '';
-  var result = { url: '' };
-  if (/^https:\/\/(maps\.app\.goo\.gl|goo\.gl|maps\.google\.[a-z.]+|www\.google\.[a-z.]+)\//.test(url)) {
-    result.url = follow_(url);
+  var result = { url: '', error: '' };
+  if (!url) result.error = 'no url parameter';
+  else if (!/^https:\/\/(maps\.app\.goo\.gl|goo\.gl|maps\.google\.[a-z.]+|www\.google\.[a-z.]+|g\.co)\//.test(url)) result.error = 'not a Google Maps link';
+  else {
+    try { result.url = follow_(url); }
+    catch (err) { result.error = String(err && err.message || err); }
   }
-  return ContentService.createTextOutput(JSON.stringify(result))
-    .setMimeType(ContentService.MimeType.JSON);
+  var body = JSON.stringify(result);
+  // A "callback" parameter makes the reply loadable from a <script> tag, which works from any web page.
+  var cb = e && e.parameter && e.parameter.callback ? String(e.parameter.callback) : '';
+  if (cb && /^[\w$.]+$/.test(cb)) {
+    return ContentService.createTextOutput(cb + '(' + body + ');').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(body).setMimeType(ContentService.MimeType.JSON);
 }
 
 /** Follow HTTP redirects by hand so the final address can be returned. */

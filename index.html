@@ -133,8 +133,8 @@ a{color:inherit}
 .link .line::before{content:"";position:absolute;left:5px;top:0;bottom:0;border-left:1px solid var(--line)}
 .link .chip{background:transparent;padding:0;font-size:14px;font-weight:400;color:var(--muted);border-radius:0;gap:6px}
 .link .chip.est{color:var(--muted)}
-.link .chip[role="button"]{cursor:pointer}
-.link .chip[role="button"]:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.link .chip[role="button"],.link a.chip{cursor:pointer;text-decoration:none}
+.link .chip[role="button"]:hover,.link a.chip:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 .link .addtr{color:var(--icon-idle);font-size:14px;opacity:0;padding:0;border-radius:0;text-align:left}
 .link:hover .addtr,.link:focus-within .addtr{opacity:1;color:var(--muted)}
 .gap{height:0}
@@ -832,7 +832,16 @@ async function updateAutoTransport() {
   } finally { S.autoBusy = false; if (S.autoAgain) { S.autoAgain = false; scheduleAuto(); } }
 }
 const autoWhy = a => a.est ? 'Estimated from the straight-line distance between the two pins. Add a Google Maps key in trip settings for real directions.' : a.src === 'osm' ? 'Routed on OpenStreetMap. Add a Google Maps key in trip settings for Google directions and subway times.' : 'Google Maps directions';
-const effectiveTransport = ev => (ev.transport && (ev.transport.mins || ev.transport.mode)) ? { ...ev.transport, manual: true } : (ev.auto && ev.auto.mode ? ev.auto : null);
+// Directions computed from the two pins win. A hand-entered time is used only when it was set as an override in the editor, or when there are no directions.
+const effectiveTransport = ev => {
+  const manual = ev.transport && (ev.transport.mins || ev.transport.mode) ? { ...ev.transport, manual: true } : null;
+  const auto = ev.auto && ev.auto.mode ? ev.auto : null;
+  if (manual && (manual.override || !auto)) return manual;
+  return auto || manual;
+};
+const DIR_MODE = { walk: 'walking', bike: 'bicycling', drive: 'driving', taxi: 'driving', tuktuk: 'driving' };
+const directionsUrl = (a, b, mode) => hasCoords(a) && hasCoords(b)
+  ? `https://www.google.com/maps/dir/?api=1&origin=${a.place.lat},${a.place.lng}&destination=${b.place.lat},${b.place.lng}&travelmode=${DIR_MODE[mode] || 'transit'}` : '';
 
 /* ================= render: top ================= */
 function renderAll() { renderTop(); renderFilters(); renderBoard(); }
@@ -909,28 +918,30 @@ function renderColumn(t, date) {
       el('span', { class: 'date' }, isUn ? 'No day yet' : fmtDate(date, { month: 'short', day: 'numeric' })),
       !isUn && el('button', { class: 'menu', 'aria-label': 'Day options', onclick: e => dayMenu(e.currentTarget, t, date) }, icon('dots'))));
   const body = el('div', { class: 'col-body', dataset: { date } });
-  evs.forEach((ev, i) => { body.append(renderLink(ev, i === 0)); body.append(renderCard(ev)); });
+  evs.forEach((ev, i) => { body.append(renderLink(ev, i === 0, evs[i - 1])); body.append(renderCard(ev)); });
   if (!evs.length && isUn) body.append(el('div', { class: 'empty-col' }, 'Drag a card here to park it, or add one below.'));
   body.append(el('button', { class: 'newcard', onclick: () => addCardDialog(date) }, icon('plus'), 'New'));
   col.append(head, body);
   return col;
 }
 /* The row between two cards: how long it takes to get from the card above to this one. */
-function renderLink(ev, first) {
+function renderLink(ev, first, prev) {
   const tr = effectiveTransport(ev);
   if (!tr && first) return el('div', { class: 'gap' });
   const link = el('div', { class: 'link' + (tr ? '' : ' empty') }, el('div', { class: 'line' }));
-  if (tr) link.append(transportChip(tr, { onclick: e => { e.stopPropagation(); openEditor(ev.id, { focus: 'transport' }); }, role: 'button', tabindex: '0',
+  const dir = prev ? directionsUrl(prev, ev, tr && tr.mode) : '';
+  if (tr && dir) link.append(transportChip(tr, { href: dir, target: '_blank', rel: 'noopener', title: (tr.manual ? 'Entered by hand' : autoWhy(tr)) + ' · opens directions in Google Maps' }, 'a'));
+  else if (tr) link.append(transportChip(tr, { onclick: e => { e.stopPropagation(); openEditor(ev.id, { focus: 'transport' }); }, role: 'button', tabindex: '0',
     title: tr.manual ? 'Entered by hand' : autoWhy(tr) }));
   else link.append(el('button', { class: 'addtr', onclick: () => openEditor(ev.id, { focus: 'transport' }) }, hasCoords(ev) ? '+ add a location to the card above for directions' : '+ add a location for directions'));
   return link;
 }
-function transportChip(tr, attrs = {}) {
+function transportChip(tr, attrs = {}, tag = 'span') {
   const m = MODES[tr.mode];
   const parts = [];
   if (tr.mins) parts.push(`${tr.est ? '~' : ''}${tr.mins} min`);
   if (m) parts.push(m.label);
-  return el('span', { class: 'chip' + (m ? ' tone' : '') + (tr.est ? ' est' : ''), style: m ? `--h:${m.h}` : '', ...attrs }, m && el('span', { 'aria-hidden': 'true' }, m.icon), parts.join(' '));
+  return el(tag, { class: 'chip' + (m ? ' tone' : '') + (tr.est ? ' est' : ''), style: m ? `--h:${m.h}` : '', ...attrs }, m && el('span', { 'aria-hidden': 'true' }, m.icon), parts.join(' '));
 }
 function renderCard(ev) {
   const t = trip();
@@ -946,7 +957,6 @@ function renderCard(ev) {
     el('span', { class: 'card-emoji' + (ev.emoji ? '' : ' none') }, ev.emoji || ''),
     el('h3', { class: 'title' + (ev.title ? '' : ' untitled'), style: 'margin:0' }, ev.title || 'Untitled')));
   const url = mapsUrl(ev);
-  if (ev.place && (ev.place.address || ev.place.url)) details.append(el('div', { class: 'card-addr' }, el('a', { href: url, target: '_blank', rel: 'noopener', onclick: e => e.stopPropagation(), title: 'Open in Google Maps' }, ev.place.address || (hasCoords(ev) ? 'Pinned · open in Google Maps' : 'Open in Google Maps'))));
   if (ev.booked || ev.reservation) details.append(el('div', { class: 'card-res ' + (ev.booked ? 'booked' : 'open') }, el('span', { class: 'st' }, ev.booked ? 'Booked' : 'Not booked'), ev.reservation && el('span', { class: 'det' }, ev.reservation)));
   const travelers = t.travelers.length ? t.travelers : ['Notes'];
   for (const who of travelers) {
@@ -1201,12 +1211,12 @@ function renderEditor() {
   const tr = ev.transport || { mins: null, mode: '' };
   const manual = !!(tr.mins || tr.mode);
   const autoLine = el('div', { class: 'auto-line', id: 'f-transport' });
-  if (ev.auto && ev.auto.mode) autoLine.append(transportChip(ev.auto), el('span', { class: 'why' }, ev.auto.est ? 'estimated from the two map pins' : ev.auto.src === 'osm' ? 'OpenStreetMap route' : 'Google Maps directions'), manual && el('span', { class: 'why' }, '· overridden below'));
+  if (ev.auto && ev.auto.mode) autoLine.append(transportChip(ev.auto), el('span', { class: 'why' }, ev.auto.est ? 'estimated from the two map pins' : ev.auto.src === 'osm' ? 'OpenStreetMap route' : 'Google Maps directions'), manual && el('span', { class: 'why' }, tr.override ? '· overridden below' : '· replaces the hand-entered time below'));
   else if (!hasCoords(ev)) autoLine.append(el('span', { class: 'why' }, 'Add a Google Maps link to this card and the one before it to get the travel time here.'));
   else autoLine.append(el('span', { class: 'why' }, 'Waiting for a located card before this one.'));
   const mins = el('input', { type: 'number', min: 0, step: 1, inputmode: 'numeric', placeholder: 'min', value: tr.mins ?? '',
-    oninput: e => patchEvent(ev.id, { transport: { ...S.events[ev.id].transport, mins: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value, 10) || 0) } }), onblur: () => flushEvent(ev.id) });
-  const mode = el('select', { onchange: e => patchEvent(ev.id, { transport: { ...S.events[ev.id].transport, mode: e.target.value } }, { immediate: true }) },
+    oninput: e => patchEvent(ev.id, { transport: { ...S.events[ev.id].transport, override: true, mins: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value, 10) || 0) } }), onblur: () => flushEvent(ev.id) });
+  const mode = el('select', { onchange: e => patchEvent(ev.id, { transport: { ...S.events[ev.id].transport, override: true, mode: e.target.value } }, { immediate: true }) },
     el('option', { value: '' }, 'How?'), Object.entries(MODES).map(([k, m]) => el('option', { value: k, selected: k === tr.mode }, `${m.icon} ${m.label}`)));
   const clearManual = manual ? el('button', { class: 'btn', style: 'margin-top:8px', onclick: () => patchEvent(ev.id, { transport: { mins: null, mode: '' } }, { immediate: true }) }, 'Use directions instead') : null;
 

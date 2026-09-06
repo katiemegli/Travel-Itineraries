@@ -664,7 +664,7 @@ function parseMapsLink(str) {
   return out;
 }
 const searchUrl = q => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
-const mapsUrl = ev => (ev.place && ev.place.url) || (ev.title ? searchUrl(ev.title + (ev.city ? ', ' + ev.city : '')) : '');
+const mapsUrl = ev => { const c = trip() ? cityFor(trip(), ev.date) : ''; return (ev.place && ev.place.url) || (ev.title ? searchUrl(ev.title + (c ? ', ' + c : '')) : ''); };
 const hasCoords = ev => !!(ev.place && typeof ev.place.lat === 'number' && typeof ev.place.lng === 'number');
 
 // The key and helper are built in; per-device overrides from earlier versions are cleared so nothing stale can shadow them.
@@ -926,7 +926,7 @@ const looksLike = (title, found) => { const a = words(title), b = new Set(words(
 async function autoLocate(ev, t) {
   if (!mapsReady() || !ev.title || ev.place || (ev.located && ev.located.v === 1)) return;
   let place = null;
-  try { const p = await lookupPlace(ev.title, cityFor(t, ev.date) || ev.city || ''); if (p && looksLike(ev.title, p.name) && matchesQuery(ev.title, p.name, p.address)) place = p; }
+  try { const p = await lookupPlace(ev.title, cityFor(t, ev.date)); if (p && looksLike(ev.title, p.name) && matchesQuery(ev.title, p.name, p.address)) place = p; }
   catch (e) { console.warn(e); return; } // leave untried so it retries after a transient failure
   patchEvent(ev.id, { located: { v: 1, at: Date.now(), ok: !!place }, ...(place ? { place } : {}) }, { immediate: true });
 }
@@ -1101,12 +1101,7 @@ function renderCard(ev) {
     details.append(el('div', { class: 'note' }, el('span', { class: 'who', title: who === 'Notes' ? 'Notes' : `${who}'s notes` }, who === 'Notes' ? 'Note' : who), el('span', { class: 'txt' }, txt)));
   }
   if (ev.rating) details.append(el('div', { class: 'card-meta' }, el('span', { class: 'stars', title: `${ev.rating} of 5` }, '★'.repeat(ev.rating) + '☆'.repeat(5 - ev.rating))));
-  if (ev.city || ev.outfit) {
-    const foot = el('div', { class: 'card-foot' });
-    if (ev.city) foot.append(el('span', { class: 'chip' }, ev.city));
-    if (ev.outfit) foot.append(el('span', { class: 'outfit' }, 'Wear: ', ev.outfit));
-    details.append(foot);
-  }
+  if (ev.outfit) details.append(el('div', { class: 'card-foot' }, el('span', { class: 'outfit' }, 'Wear: ', ev.outfit)));
   attachDrag(card, grip, ev);
   return card;
 }
@@ -1278,7 +1273,8 @@ function placeField(state, cityArg, onChange, { placeholder } = {}) {
 S.biasCache = {};
 async function tripBias(city) {
   // Prefer pins already placed in this city; a trip spanning two cities must never be biased to the middle of the sea between them.
-  const pinned = Object.values(S.events).filter(e => hasCoords(e) && (!city || (e.city && e.city.toLowerCase() === city.toLowerCase())));
+  const t = trip();
+  const pinned = Object.values(S.events).filter(e => hasCoords(e) && (!city || !t || cityFor(t, e.date).toLowerCase() === city.toLowerCase()));
   if (pinned.length) return { lat: pinned.reduce((s, e) => s + e.place.lat, 0) / pinned.length, lng: pinned.reduce((s, e) => s + e.place.lng, 0) / pinned.length };
   if (!city || !mapsReady()) return null;
   if (S.biasCache[city] !== undefined) return S.biasCache[city];
@@ -1305,7 +1301,6 @@ function reservationField(state, onChange) {
 function addCardDialog(date) {
   const t = trip(); if (!t) return;
   const ev = newEvent(date || '');
-  ev.city = cityFor(t, ev.date);
   S.draftId = ev.id;
   insertEvent(ev);
   openEditor(ev.id, { focus: 'place' });
@@ -1353,7 +1348,7 @@ function renderEditor() {
 
   // Place: paste a link or a name; the lookup fills the address and pin.
   const pst = { title: ev.place && ev.place.name ? ev.place.name : '', place: ev.place, busy: false, needsName: false, promise: null };
-  const pf = placeField(pst, () => cityFor(t, S.events[ev.id] ? S.events[ev.id].date : ev.date) || ev.city, () => {
+  const pf = placeField(pst, () => cityFor(t, S.events[ev.id] ? S.events[ev.id].date : ev.date), () => {
     if (pst.busy) return;
     const changes = { place: pst.place ? { ...pst.place, name: pst.place.name || pst.title } : null };
     if (!ev.title && pst.title) changes.title = pst.title;
@@ -1400,9 +1395,6 @@ function renderEditor() {
     el('option', { value: '' }, 'How?'), Object.entries(MODES).map(([k, m]) => el('option', { value: k, selected: k === tr.mode }, `${m.icon} ${m.label}`)));
   const clearManual = manual ? el('button', { class: 'btn', style: 'margin-top:8px', onclick: () => patchEvent(ev.id, { transport: { mins: null, mode: '' } }, { immediate: true }) }, 'Use directions instead') : null;
 
-  const cities = [...new Set([...(t.cities || []), ...Object.values(S.events).map(e => e.city).filter(Boolean)])];
-  const city = el('input', { value: ev.city, placeholder: 'City', list: 'city-list', oninput: e => patchEvent(ev.id, { city: e.target.value }), onblur: () => flushEvent(ev.id) });
-  const cityList = el('datalist', { id: 'city-list' }, cities.map(c => el('option', { value: c })));
   const outfit = el('textarea', { rows: 1, value: ev.outfit || '', placeholder: 'What to wear', oninput: e => { patchEvent(ev.id, { outfit: e.target.value }); autosize(e.target); }, onblur: () => flushEvent(ev.id) });
   requestAnimationFrame(() => autosize(outfit));
 
@@ -1423,7 +1415,6 @@ function renderEditor() {
       prop('route', 'Transportation', autoLine, el('div', { class: 'section-h' }, 'Override by hand'), el('div', { class: 'row', style: 'margin-top:6px' }, mins, mode), clearManual),
       prop('star', 'Rating', rating),
       prop('archive', 'Archive', archive),
-      prop('pin', 'City', city, cityList),
       prop('shirt', 'Outfit', outfit),
       el('div', { class: 'ed-foot' },
         el('button', { class: 'btn', onclick: () => duplicateEvent(ev.id) }, icon('copy'), 'Duplicate'),

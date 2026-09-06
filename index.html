@@ -609,7 +609,7 @@ function patchEvent(id, changes, { immediate = false } = {}) {
   clearTimeout(S.timers[id]);
   if (immediate) flushEvent(id); else S.timers[id] = setTimeout(() => flushEvent(id), 450);
   scheduleBoard();
-  if (immediate && S.editingId === id) { const ed = $('#editor'); if (!(ed.contains(document.activeElement) && document.activeElement !== ed)) renderEditor(); }
+  if (immediate && S.editingId === id) { const a = document.activeElement, ed = $('#editor'); const typing = a && ed.contains(a) && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && !['checkbox', 'radio', 'date', 'time'].includes(a.type))); if (!typing) renderEditor(); }
   return ev;
 }
 function flushEvent(id) {
@@ -908,8 +908,8 @@ async function googlePair(a, b) {
   const walk = await duration(a, b, 'WALKING');
   if (walk != null && walk < WALK_MAX) return { mode: 'walk', mins: walk };
   const transit = await duration(a, b, 'TRANSIT');
-  if (transit != null && transit < TRANSIT_MAX) return { mode: 'subway', mins: transit };
   const drive = await duration(a, b, 'DRIVING');
+  if (transit != null && transit < TRANSIT_MAX) return { mode: 'subway', mins: transit, alt: drive != null ? { mode: 'drive', mins: drive } : null }; // subway, with the car time after it
   if (drive != null) return { mode: 'drive', mins: drive };
   if (transit != null) return { mode: 'subway', mins: transit };
   if (walk != null) return { mode: 'walk', mins: walk };
@@ -943,7 +943,7 @@ async function updateAutoTransport() {
         const key = a ? pairKey(a, b) : '';
         if (!key) { if (b.auto) patchEvent(b.id, { auto: null }, { immediate: true }); continue; }
         const available = mapsReady() ? 2 : osmOk() ? 1 : 0; // google > openstreetmap > straight-line estimate
-        if (b.auto && b.auto.key === key && (b.auto.rank || 0) >= available) continue;
+        if (b.auto && b.auto.key === key && (b.auto.rank || 0) >= available && !(b.auto.mode === 'subway' && b.auto.rank === 2 && b.auto.alt === undefined)) continue;
         let r = null;
         if (mapsReady()) { try { r = await googlePair(a, b); } catch (e) { console.warn(e); } }
         if (r) r.rank = 2;
@@ -976,8 +976,7 @@ function renderTop() {
   if (!S.ready) { top.append(el('div'), el('div', { class: 'top-actions' }, status)); return; }
   const name = t ? t.name : 'Bookshelf of Memories';
   const count = t ? Object.values(S.events).filter(e => !e.archived).length : 0;
-  const places = t && t.stays && t.stays.length ? t.stays.map(s => s.city).filter(Boolean).join(', ') : '';
-  const sub = t ? (t.subtitle || [places, `${t.days.length} day${t.days.length === 1 ? '' : 's'}`, `${count} stop${count === 1 ? '' : 's'}`].filter(Boolean).join(' · ')) : 'Plan each day as a board of cards';
+  const sub = t ? (t.subtitle || [`${t.days.length} day${t.days.length === 1 ? '' : 's'}`, `${count} stop${count === 1 ? '' : 's'}`].join(' · ')) : 'Plan each day as a board of cards';
   top.append(
     el('div', { class: 'top-row' },
       el('button', { class: 'trip-btn', onclick: e => tripMenu(e.currentTarget), 'aria-label': 'Switch trip' }, el('span', { class: 'ring' }, icon('backline')), 'Trips'),
@@ -1078,7 +1077,8 @@ function transportChip(tr, attrs = {}, tag = 'span') {
   const parts = [];
   if (tr.mins) parts.push(`${tr.est ? '~' : ''}${tr.mins} min`);
   if (m) parts.push(m.label);
-  return el(tag, { class: 'chip' + (m ? ' tone' : '') + (tr.est ? ' est' : ''), style: m ? `--h:${m.h}` : '', ...attrs }, m && el('span', { 'aria-hidden': 'true' }, m.icon), parts.join(' '));
+  const alt = tr.alt && MODES[tr.alt.mode] ? [' · ', el('span', { 'aria-hidden': 'true' }, MODES[tr.alt.mode].icon), ` ${tr.alt.mins} min ${MODES[tr.alt.mode].label}`] : [];
+  return el(tag, { class: 'chip' + (m ? ' tone' : '') + (tr.est ? ' est' : ''), style: m ? `--h:${m.h}` : '', ...attrs }, m && el('span', { 'aria-hidden': 'true' }, m.icon), parts.join(' '), ...alt);
 }
 function renderCard(ev) {
   const t = trip();
@@ -1301,47 +1301,14 @@ function reservationField(state, onChange) {
 }
 
 /* ================= add-card dialog ================= */
+/* New cards open in the same popover as existing ones, with every field. A card closed with no name and no place is discarded. */
 function addCardDialog(date) {
   const t = trip(); if (!t) return;
-  const st = { title: '', place: null, busy: false, needsName: false, promise: null, category: '', date: date || '', time: '', timeTouched: false, notes: {}, booked: false, reservation: '' };
-  const travelers = t.travelers.length ? t.travelers : ['Notes'];
-  const prop = (ic, label, ...ctrl) => el('div', { class: 'prop' }, el('div', { class: 'prop-k' }, icon(ic), el('span', {}, label)), el('div', { class: 'prop-v' }, ...ctrl));
-  const submit = el('button', { class: 'btn primary', type: 'button' }, 'Add card');
-  const refreshSubmit = () => { submit.disabled = !st.title.trim() && !st.place; };
-  const pf = placeField(st, () => cityFor(t, st.date), refreshSubmit);
-  const time = el('input', { type: 'time', value: st.time, onchange: e => { st.time = e.target.value; st.timeTouched = true; } });
-  const catSeg = segmented(t.categories.map(c => ({ value: c.id, label: `${c.emoji} ${c.name}` })), '', v => {
-    st.category = v; const c = catOf(v);
-    if (c && c.autoTime && !st.timeTouched) { st.time = c.autoTime; time.value = c.autoTime; }
-  });
-  const dateInp = el('input', { type: 'date', value: st.date, onchange: e => { st.date = e.target.value; } });
-  const noteRows = travelers.map(who => {
-    const ta = el('textarea', { rows: 1, placeholder: who === 'Notes' ? 'Notes' : `What ${who} wants to remember`, oninput: e => { st.notes[who] = e.target.value; autosize(e.target); } });
-    return prop('person', who === 'Notes' ? 'Notes' : `${who}'s notes`, ta);
-  });
-  const res = reservationField(st, () => {});
-  submit.addEventListener('click', async () => {
-    submit.disabled = true; submit.textContent = 'Adding…';
-    await pf.run(); if (st.promise) { try { await st.promise; } catch {} }
-    if (!st.title.trim() && !st.place) { submit.disabled = false; submit.textContent = 'Add card'; pf.input.focus(); return; }
-    const ev = { ...newEvent(st.date), title: st.title.trim() || (st.place && st.place.name) || 'Untitled', place: st.place, category: st.category, time: st.time,
-      notes: Object.fromEntries(Object.entries(st.notes).filter(([, v]) => v && v.trim())), booked: st.booked, reservation: st.reservation.trim(), city: (st.place && st.place.address && t.cities.find(c => st.place.address.includes(c))) || cityFor(t, st.date) };
-    if (st.date && !t.days.includes(st.date)) addDay(t, st.date);
-    d.close(); insertEvent(ev);
-  });
-  refreshSubmit();
-  const d = dialog([
-    el('h2', {}, 'Add a card'),
-    el('p', {}, 'Type a place name or paste a Google Maps link. Everything else is optional.'),
-    prop('pin', 'Place', pf),
-    prop('tag', 'Category', catSeg),
-    prop('cal', 'Date', dateInp),
-    prop('clock', 'Time', time, el('div', { class: 'ed-hint' }, 'Lunch fills in 12:00 and dinner 17:30. Change it any time.')),
-    ...noteRows,
-    prop('book', 'Reservation', res),
-    el('div', { class: 'dlg-actions' }, el('button', { class: 'btn', type: 'button', onclick: () => d.close() }, 'Cancel'), submit),
-  ]);
-  setTimeout(() => pf.input.focus(), 30);
+  const ev = newEvent(date || '');
+  ev.city = cityFor(t, ev.date);
+  S.draftId = ev.id;
+  insertEvent(ev);
+  openEditor(ev.id, { focus: 'place' });
 }
 
 /* ================= editor ================= */
@@ -1355,6 +1322,9 @@ function openEditor(id, opts = {}) {
   if (opts.focus === 'place') setTimeout(() => { const f = $('#f-place input', ed); f && f.focus(); }, 30);
 }
 function closeEditor() {
+  const id = S.editingId;
+  if (id && S.draftId === id) { const ev = S.events[id]; if (ev && !ev.title.trim() && !ev.place) { S.editingId = null; S.draftId = null; deleteEvent(id); } }
+  if (S.draftId === id) S.draftId = null;
   S.editingId = null; editorRendered = '';
   $('#editor').classList.remove('open'); $('#backdrop').classList.remove('open');
   $('#editor').replaceChildren();
@@ -1440,7 +1410,7 @@ function renderEditor() {
 
   ed.append(
     el('div', { class: 'ed-top' },
-      el('span', { class: 'day', style: 'padding-left:8px' }, dayName),
+      el('span', { class: 'day', style: 'padding-left:8px' }, (S.draftId === ev.id ? 'New card · ' : '') + dayName),
       el('button', { class: 'iconbtn', 'aria-label': 'Close', onclick: closeEditor }, icon('x'))),
     el('div', { class: 'ed-scroll' },
       el('div', { class: 'ed-hero' }, emojiBtn, title),

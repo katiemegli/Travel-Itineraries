@@ -1,0 +1,975 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Bookshelf of Memories</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* ---------- tokens ---------- */
+:root{
+  --bg:#EEF0EB; --panel:#FFFFFF; --panel-2:#F4F6F2; --ink:#161A18; --muted:#5E6965; --line:#D7DDD8; --line-strong:#B4BDB7;
+  --accent:#B67A10; --accent-soft:#F6E7C4; --accent-ink:#FFFFFF; --danger:#B3402E; --ok:#2E7D5B;
+  --tone-s:58%; --tone-bg-l:91%; --tone-fg-l:30%;
+  --shadow:0 12px 32px rgba(20,30,26,.14); --shadow-sm:0 1px 2px rgba(20,30,26,.06);
+  --display:"Bricolage Grotesque","Avenir Next","Segoe UI",sans-serif;
+  --body:"Instrument Sans","Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1514; --panel:#1A2120; --panel-2:#212A28; --ink:#ECEFEA; --muted:#93A09A; --line:#2A3432; --line-strong:#41504C;
+    --accent:#F0B646; --accent-soft:#3A2E12; --accent-ink:#1B1400; --danger:#F08A7A; --ok:#7BD3A8;
+    --tone-s:42%; --tone-bg-l:24%; --tone-fg-l:82%;
+    --shadow:0 12px 32px rgba(0,0,0,.5); --shadow-sm:0 1px 2px rgba(0,0,0,.3);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1514; --panel:#1A2120; --panel-2:#212A28; --ink:#ECEFEA; --muted:#93A09A; --line:#2A3432; --line-strong:#41504C;
+  --accent:#F0B646; --accent-soft:#3A2E12; --accent-ink:#1B1400; --danger:#F08A7A; --ok:#7BD3A8;
+  --tone-s:42%; --tone-bg-l:24%; --tone-fg-l:82%;
+  --shadow:0 12px 32px rgba(0,0,0,.5); --shadow-sm:0 1px 2px rgba(0,0,0,.3);
+  color-scheme:dark;
+}
+
+/* ---------- base ---------- */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--body);-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+input,select,textarea{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+textarea{resize:none;line-height:1.4}
+input[type="checkbox"]{width:auto}
+input[type="date"],input[type="time"]{font-variant-numeric:tabular-nums}
+.hidden,[hidden]{display:none!important}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+#app{height:100dvh;display:flex;flex-direction:column;min-height:0}
+
+/* ---------- top bar ---------- */
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px 18px 8px;padding-top:max(14px,env(safe-area-inset-top))}
+.trip-btn{display:flex;align-items:center;gap:6px;text-align:left;border-radius:8px;padding:2px 6px 2px 0}
+.trip-btn:hover{background:var(--panel-2)}
+.trip-name{font:600 24px/1.1 var(--display);letter-spacing:-.01em;text-wrap:balance}
+.trip-btn svg{width:16px;height:16px;color:var(--muted);flex:none}
+.trip-sub{color:var(--muted);font-size:13px;margin-top:2px;font-variant-numeric:tabular-nums}
+.top-actions{display:flex;align-items:center;gap:6px;flex:none}
+.status{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;padding:6px 8px;white-space:nowrap}
+.status .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.status.ok .dot{background:var(--ok)}
+.status.busy .dot{background:var(--accent);animation:pulse 1s infinite}
+.status.err{color:var(--danger)} .status.err .dot{background:var(--danger)}
+@keyframes pulse{50%{opacity:.35}}
+.iconbtn{width:36px;height:36px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}
+.iconbtn:hover{background:var(--panel-2);color:var(--ink)}
+.iconbtn svg{width:20px;height:20px}
+.filters{display:flex;gap:6px;padding:4px 18px 10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.filters::-webkit-scrollbar{display:none}
+.fchip{flex:none;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:500;color:var(--muted);background:var(--panel);display:inline-flex;gap:5px;align-items:center;white-space:nowrap}
+.fchip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.fchip .n{opacity:.6;font-variant-numeric:tabular-nums}
+
+/* ---------- board ---------- */
+.main{flex:1;display:flex;min-height:0;position:relative}
+.board{flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;display:flex;gap:14px;padding:4px 18px 16px;align-items:stretch;scroll-snap-type:x proximity;scroll-padding-left:18px;-webkit-overflow-scrolling:touch}
+.col{flex:0 0 300px;width:300px;display:flex;flex-direction:column;min-height:0;scroll-snap-align:start;border-radius:14px;transition:background .15s}
+.col.drop{background:var(--accent-soft)}
+.col-head{display:flex;align-items:flex-end;justify-content:space-between;padding:8px 10px 10px;gap:8px}
+.col-head .dow{font:600 20px/1 var(--display);letter-spacing:-.01em}
+.col-head .date{color:var(--muted);font-size:12px;margin-top:4px;font-variant-numeric:tabular-nums}
+.col-head .cnt{color:var(--muted);font-size:12px;white-space:nowrap}
+.col-head .menu{width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}
+.col-head .menu:hover{background:var(--panel-2);color:var(--ink)}
+.col-head .menu svg{width:16px;height:16px}
+.col-body{flex:1;min-height:0;overflow-y:auto;padding:2px 4px 8px;display:flex;flex-direction:column;scrollbar-width:thin}
+.col.unsched .col-head .dow{color:var(--muted);font-weight:500}
+.col.addday{flex-basis:200px;width:200px}
+.addday-btn,.newcard{display:flex;align-items:center;gap:8px;color:var(--muted);padding:10px 12px;border-radius:12px;border:1px dashed var(--line-strong);font-weight:500;width:100%;text-align:left}
+.addday-btn:hover,.newcard:hover{color:var(--ink);background:var(--panel);border-style:solid}
+.newcard{margin-top:6px;border-style:solid;border-color:transparent}
+.newcard:hover{border-color:var(--line)}
+.addday-btn svg,.newcard svg{width:16px;height:16px}
+.empty-col{color:var(--muted);font-size:13px;padding:8px 12px}
+
+/* card */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 10px 10px 12px;box-shadow:var(--shadow-sm);cursor:pointer;user-select:none;-webkit-user-select:none;position:relative;transition:transform .12s,box-shadow .12s}
+.card:hover{border-color:var(--line-strong)}
+.card.dragging{opacity:.35}
+.card.ghost{position:fixed;z-index:100;pointer-events:none;box-shadow:var(--shadow);transform-origin:center;opacity:.96;cursor:grabbing}
+.card.archived{opacity:.55}
+.card.archived .title{text-decoration:line-through;text-decoration-color:var(--muted)}
+.card-cat{display:flex;align-items:center;gap:5px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;color:hsl(var(--h) var(--tone-s) var(--tone-fg-l));margin-bottom:6px}
+.card-cat i{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+.card-head{display:flex;align-items:flex-start;gap:8px}
+.card-emoji{font-size:20px;line-height:22px;width:24px;flex:none;text-align:center}
+.card-emoji.none{opacity:.25}
+.title{font:600 15px/1.25 var(--display);flex:1;min-width:0;overflow-wrap:anywhere;padding-top:2px}
+.title.untitled{color:var(--muted);font-weight:500}
+.grip{flex:none;width:26px;height:26px;margin:-4px -4px 0 0;border-radius:6px;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;touch-action:none;cursor:grab;opacity:.55}
+.grip:hover{opacity:1;background:var(--panel-2)}
+.grip svg{width:14px;height:14px}
+.card-res{margin-top:6px;font-size:13px;color:var(--ink)}
+.card-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:500;line-height:1;padding:5px 8px;border-radius:6px;font-variant-numeric:tabular-nums;white-space:nowrap;background:var(--panel-2);color:var(--muted)}
+.chip.tone{background:hsl(var(--h) var(--tone-s) var(--tone-bg-l));color:hsl(var(--h) var(--tone-s) var(--tone-fg-l))}
+.stars{font-size:12px;letter-spacing:1px;color:var(--accent)}
+.note{display:flex;gap:7px;margin-top:8px;font-size:13px;line-height:1.35;align-items:flex-start}
+.note .who{flex:none;width:18px;height:18px;border-radius:50%;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);font-size:10px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;margin-top:1px}
+.note .txt{white-space:pre-wrap;overflow-wrap:anywhere}
+.card-foot{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:12px;color:var(--muted);align-items:center}
+.card-foot .outfit{display:inline-flex;gap:4px;align-items:center;overflow-wrap:anywhere}
+
+/* transport connector between cards */
+.link{display:grid;grid-template-columns:24px 1fr;align-items:center;min-height:34px;padding-left:12px;gap:4px}
+.link .line{justify-self:center;width:0;height:100%;min-height:34px;border-left:2px dashed var(--line-strong)}
+.link.empty .line{opacity:.6}
+.link .chip{justify-self:start}
+.link .addtr{color:var(--muted);font-size:12px;opacity:0;padding:4px 6px;border-radius:6px}
+.link:hover .addtr,.link:focus-within .addtr{opacity:1}
+.link .addtr:hover{background:var(--panel)}
+.gap{height:8px}
+@media (hover:none){.link .addtr{opacity:.75}}
+
+/* ---------- editor ---------- */
+.editor{width:440px;flex:none;background:var(--panel);border-left:1px solid var(--line);display:none;flex-direction:column;min-height:0}
+.editor.open{display:flex}
+.ed-top{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 0}
+.ed-scroll{flex:1;overflow-y:auto;padding:6px 20px 32px}
+.ed-hero{display:flex;gap:12px;align-items:flex-start;margin:6px 0 18px}
+.emoji-btn{width:52px;height:52px;border-radius:12px;border:1px dashed var(--line-strong);font-size:30px;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex:none;background:var(--panel-2)}
+.emoji-btn.has{border-style:solid;border-color:transparent}
+.ed-title{font:600 24px/1.15 var(--display);background:none;border:0;padding:8px 0;border-radius:0;letter-spacing:-.01em}
+.ed-title:focus{box-shadow:none}
+.emoji-pop{position:fixed;z-index:50;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px;width:296px}
+.emoji-pop input{margin-bottom:8px}
+.emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:2px}
+.emoji-grid button{font-size:20px;height:32px;border-radius:6px}
+.emoji-grid button:hover{background:var(--panel-2)}
+.prop{display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:start;padding:5px 0;min-height:40px}
+.prop-k{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;padding-top:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prop-k svg{width:16px;height:16px;flex:none}
+.prop-v{min-width:0}
+.prop-v .row{display:flex;gap:8px;align-items:center}
+.prop-v .row input[type="number"]{width:84px;flex:none}
+.switch{display:inline-flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer}
+.switch input{appearance:none;width:34px;height:20px;border-radius:999px;background:var(--line-strong);position:relative;margin:0;padding:0;border:0;cursor:pointer;flex:none}
+.switch input::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--panel);transition:left .15s}
+.switch input:checked{background:var(--accent)}
+.switch input:checked::after{left:16px}
+.switch input:focus{box-shadow:0 0 0 3px var(--accent-soft)}
+.rating{display:flex;gap:2px;padding:6px 0}
+.rating button{font-size:20px;line-height:1;color:var(--line-strong);padding:2px}
+.rating button.on{color:var(--accent)}
+.rating .clear{font-size:12px;color:var(--muted);margin-left:8px;align-self:center}
+.ed-foot{display:flex;gap:8px;padding:16px 0 0;border-top:1px solid var(--line);margin-top:18px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:8px 14px;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--panel-2)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.btn.primary:hover{filter:brightness(1.05)}
+.btn.danger{color:var(--danger)}
+.btn.danger:hover{background:color-mix(in srgb,var(--danger) 10%,var(--panel))}
+.btn svg{width:16px;height:16px}
+.ed-hint{color:var(--muted);font-size:12px;margin-top:6px}
+.backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:30}
+
+/* ---------- popover / dialogs ---------- */
+.pop{position:fixed;z-index:50;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;min-width:200px;max-width:min(320px,calc(100vw - 24px))}
+.pop button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 10px;border-radius:8px;font-size:14px}
+.pop button:hover{background:var(--panel-2)}
+.pop button.danger{color:var(--danger)}
+.pop button .chk{width:16px;flex:none;color:var(--accent);text-align:center}
+.pop hr{border:0;border-top:1px solid var(--line);margin:6px 4px}
+.pop .lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:6px 10px 2px;font-weight:600}
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:0;width:min(520px,calc(100vw - 24px));box-shadow:var(--shadow);max-height:calc(100dvh - 40px)}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+.dlg{padding:20px 22px 22px;display:flex;flex-direction:column;gap:14px;max-height:calc(100dvh - 40px);overflow-y:auto}
+.dlg h2{font:600 22px/1.15 var(--display);margin:0;letter-spacing:-.01em}
+.dlg p{margin:0;color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.03em}
+.field .hint{font-size:12px;color:var(--muted)}
+.fields-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dlg-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.catrow{display:grid;grid-template-columns:52px 1fr 36px;gap:6px;align-items:center}
+.catrow input.em{text-align:center;font-size:18px;padding:5px}
+.catrow .del{color:var(--muted);width:36px;height:36px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center}
+.catrow .del:hover{background:var(--panel-2);color:var(--danger)}
+.catlist{display:flex;flex-direction:column;gap:6px}
+
+/* empty / loading */
+.center{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+.hello{max-width:420px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
+.hello h1{font:600 30px/1.1 var(--display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+.hello p{color:var(--muted);margin:0}
+
+/* ---------- mobile ---------- */
+@media (max-width:760px){
+  .top{padding:12px 14px 6px;padding-top:max(12px,env(safe-area-inset-top))}
+  .trip-name{font-size:21px}
+  .filters{padding:2px 14px 8px}
+  .board{gap:10px;padding:2px 14px 12px;scroll-snap-type:x mandatory;scroll-padding-left:14px}
+  .col{flex-basis:calc(100vw - 52px);width:calc(100vw - 52px)}
+  .col.addday{flex-basis:170px;width:170px}
+  .editor{position:fixed;left:0;right:0;bottom:0;top:auto;height:min(92dvh,100%);width:auto;border-left:0;border-top:1px solid var(--line);border-radius:18px 18px 0 0;z-index:40;box-shadow:var(--shadow);transform:translateY(100%);transition:transform .22s ease;display:flex}
+  .editor.open{transform:translateY(0)}
+  .ed-scroll{padding:4px 16px calc(24px + env(safe-area-inset-bottom))}
+  .backdrop.open{display:block}
+  .prop{grid-template-columns:120px 1fr}
+  .status .txt{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top" id="top"></header>
+  <div class="filters" id="filters"></div>
+  <div class="main">
+    <div class="board" id="board"></div>
+    <aside class="editor" id="editor" aria-label="Card details"></aside>
+  </div>
+</div>
+<div class="backdrop" id="backdrop"></div>
+<dialog id="dlg"></dialog>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= utilities ================= */
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') n.className = v;
+    else if (k === 'style') n.style.cssText = v;
+    else if (k === 'dataset') Object.assign(n.dataset, v);
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else if (k === 'value' || k === 'checked' || k === 'selected' || k === 'disabled') n[k] = v;
+    else n.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat(Infinity)) {
+    if (c == null || c === false) continue;
+    n.append(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return n;
+};
+const uid = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36);
+const clone = o => JSON.parse(JSON.stringify(o));
+const pad = n => String(n).padStart(2, '0');
+const parseDate = iso => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
+const toISO = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const addDays = (iso, n) => { const d = parseDate(iso); d.setDate(d.getDate() + n); return toISO(d); };
+const today = () => toISO(new Date());
+const fmtDate = (iso, o) => parseDate(iso).toLocaleDateString(undefined, o || { month: 'short', day: 'numeric', year: 'numeric' });
+const weekday = iso => parseDate(iso).toLocaleDateString(undefined, { weekday: 'long' });
+const fmtTime = t => {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  return `${((h + 11) % 12) + 1}:${pad(m)} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+const fmtRange = days => {
+  if (!days.length) return 'No days yet';
+  const a = parseDate(days[0]), b = parseDate(days[days.length - 1]);
+  if (days.length === 1) return fmtDate(days[0]);
+  if (a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth())
+    return `${a.toLocaleDateString(undefined, { month: 'short' })} ${a.getDate()} – ${b.getDate()}, ${b.getFullYear()}`;
+  return `${fmtDate(days[0], { month: 'short', day: 'numeric' })} – ${fmtDate(days[days.length - 1])}`;
+};
+const initials = name => name.trim().split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '·';
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+const ICONS = {
+  chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+  grip: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5" fill="currentColor"/></svg>',
+  book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/></svg>',
+  person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="7" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H14a3 3 0 0 0 0-6h-4a3 3 0 0 1 0-6h5.5"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 22s7-6.6 7-12a7 7 0 1 0-14 0c0 5.4 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+  shirt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 3 3 6l2 5 2-1v11h10V10l2 1 2-5-6-3a3 3 0 0 1-6 0z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  archive: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v12h14V8M10 12h4"/></svg>',
+};
+const icon = name => { const s = el('span', { class: 'ic', style: 'display:inline-flex' }); s.innerHTML = ICONS[name]; return s.firstChild; };
+
+/* ================= constants ================= */
+const MODES = {
+  walk:   { label: 'walk',    icon: '🚶', h: 145 },
+  subway: { label: 'subway',  icon: '🚇', h: 215 },
+  bus:    { label: 'bus',     icon: '🚌', h: 215 },
+  tram:   { label: 'tram',    icon: '🚋', h: 215 },
+  train:  { label: 'train',   icon: '🚆', h: 245 },
+  taxi:   { label: 'taxi',    icon: '🚕', h: 38 },
+  drive:  { label: 'drive',   icon: '🚗', h: 38 },
+  tuktuk: { label: 'tuk-tuk', icon: '🛺', h: 38 },
+  bike:   { label: 'bike',    icon: '🚲', h: 100 },
+  ferry:  { label: 'ferry',   icon: '⛴️', h: 190 },
+  flight: { label: 'flight',  icon: '✈️', h: 275 },
+};
+const TIME_H = 325;
+const DEFAULT_CATEGORIES = [
+  { id: 'food',     name: 'Food',     emoji: '🍽️', h: 18 },
+  { id: 'drinks',   name: 'Drinks',   emoji: '🍸', h: 330 },
+  { id: 'sights',   name: 'Sights',   emoji: '🏛️', h: 210 },
+  { id: 'activity', name: 'Activity', emoji: '🎟️', h: 275 },
+  { id: 'hotel',    name: 'Hotel',    emoji: '🏨', h: 150 },
+  { id: 'transit',  name: 'Transit',  emoji: '✈️', h: 195 },
+  { id: 'shopping', name: 'Shopping', emoji: '🛍️', h: 45 },
+  { id: 'rest',     name: 'Rest',     emoji: '🛋️', h: 100 },
+];
+const EMOJI = '🥪 🍜 🍣 🍛 🍕 🍔 🥐 🍰 🍦 ☕ 🍵 🍷 🍸 🍺 🥂 🍹 🏛️ 🏰 🗼 🗽 ⛩️ 🕌 🎡 🎢 🎨 🖼️ 🎭 🎶 🎫 🎟️ 🌺 🌸 🌳 🌊 🏖️ ⛰️ 🏞️ 🌅 🌃 🏙️ 🛍️ 👗 👚 💄 💅 🧖 🛀 🛏️ 🏨 🏠 🛬 🛫 ✈️ 🚆 🚇 🚌 🚕 ⛴️ 🚲 🐚 🐔 🍗 🥩 🦞 🦪 🐟 🧭 📸 🗺️ 🎁 💍 ❤️ ⭐'.split(' ');
+const RESERVATION_HINTS = ['Booked', 'Need to book', 'Walk-in', 'Tickets bought', 'Waitlist', 'No reservation needed'];
+
+/* ================= storage backends ================= */
+class LocalStore {
+  constructor() {
+    this.key = 'bookshelf-of-memories/v1';
+    this.data = this.read();
+    this.tripCb = null; this.evCb = null; this.evTrip = null;
+    window.addEventListener('storage', e => {
+      if (e.key !== this.key) return;
+      this.data = this.read();
+      this.tripCb && this.tripCb(Object.values(this.data.trips));
+      this.evCb && this.evCb(Object.values(this.data.events[this.evTrip] || {}));
+    });
+  }
+  read() { try { return JSON.parse(localStorage.getItem(this.key)) || { trips: {}, events: {} }; } catch { return { trips: {}, events: {} }; } }
+  persist() { try { localStorage.setItem(this.key, JSON.stringify(this.data)); } catch (e) { throw { code: 'unavailable', message: 'Could not save to this browser' }; } }
+  watchTrips(cb) { this.tripCb = cb; cb(Object.values(this.data.trips)); return () => { this.tripCb = null; }; }
+  watchEvents(tripId, cb) { this.evCb = cb; this.evTrip = tripId; cb(Object.values(this.data.events[tripId] || {})); return () => { this.evCb = null; }; }
+  async saveTrip(t) { this.data.trips[t.id] = t; this.persist(); }
+  async deleteTrip(id) { delete this.data.trips[id]; delete this.data.events[id]; this.persist(); }
+  async saveEvent(tripId, ev) { (this.data.events[tripId] ||= {})[ev.id] = ev; this.persist(); }
+  async deleteEvent(tripId, id) { delete (this.data.events[tripId] || {})[id]; this.persist(); }
+}
+class DbStore {
+  constructor(db) { this.db = db; }
+  async retry(fn) {
+    try { return await fn(); }
+    catch (e) {
+      if (e && e.code === 'unavailable') { await new Promise(r => setTimeout(r, 400 + Math.random() * 600)); return fn(); }
+      throw e;
+    }
+  }
+  watchTrips(cb, err) { return this.db.collection('trips').onSnapshot(s => cb(s.docs.filter(d => d.exists).map(d => d.data())), err); }
+  watchEvents(tripId, cb, err) { return this.db.collection('trips/' + tripId + '/events').onSnapshot(s => cb(s.docs.filter(d => d.exists).map(d => d.data())), err); }
+  saveTrip(t) { return this.retry(() => this.db.doc('trips/' + t.id).set(clone(t))); }
+  async deleteTrip(id) {
+    const evs = await this.db.collection('trips/' + id + '/events').get();
+    for (const d of evs.docs) await this.db.doc('trips/' + id + '/events/' + d.id).delete();
+    await this.retry(() => this.db.doc('trips/' + id).delete());
+  }
+  saveEvent(tripId, ev) { return this.retry(() => this.db.doc('trips/' + tripId + '/events/' + ev.id).set(clone(ev))); }
+  deleteEvent(tripId, id) { return this.retry(() => this.db.doc('trips/' + tripId + '/events/' + id).delete()); }
+}
+
+/* ================= state ================= */
+const S = {
+  store: null, backend: 'local', ready: false,
+  trips: {}, events: {}, tripId: null,
+  pending: {}, pendingTrip: {}, timers: {},
+  showArchived: false, catFilter: '',
+  editingId: null, unsubEvents: null,
+  savingCount: 0, lastError: null,
+};
+const trip = () => S.trips[S.tripId];
+const catOf = id => (trip()?.categories || []).find(c => c.id === id);
+
+/* ================= status ================= */
+function setStatus() {
+  const s = $('#status'); if (!s) return;
+  s.className = 'status';
+  const where = S.backend === 'shared' ? 'shared with your trip' : 'saved on this device';
+  if (S.lastError) { s.classList.add('err'); s.querySelector('.txt').textContent = S.lastError; s.title = S.lastError; return; }
+  if (S.savingCount > 0) { s.classList.add('busy'); s.querySelector('.txt').textContent = 'Saving…'; }
+  else { s.classList.add('ok'); s.querySelector('.txt').textContent = S.backend === 'shared' ? 'Synced' : 'Saved'; }
+  s.title = `Changes are ${where} automatically`;
+}
+async function track(p) {
+  S.savingCount++; S.lastError = null; setStatus();
+  try { await p; }
+  catch (e) {
+    console.error(e);
+    S.lastError = e && e.code === 'quota_exceeded' ? 'Storage full – delete some cards' : 'Could not save – check your connection';
+  }
+  finally { S.savingCount--; setStatus(); }
+}
+
+/* ================= trips ================= */
+function newTrip({ name, start, nDays, travelers, cities }) {
+  const days = []; for (let i = 0; i < nDays; i++) days.push(addDays(start, i));
+  return { id: uid(), name: name || 'Untitled trip', subtitle: '', days, travelers, cities, categories: clone(DEFAULT_CATEGORIES), createdAt: Date.now(), updatedAt: Date.now() };
+}
+function saveTrip(t, { debounced } = {}) {
+  t.updatedAt = Date.now();
+  S.trips[t.id] = t; S.pendingTrip[t.id] = t;
+  const write = () => {
+    const snap = clone(t);
+    track(Promise.resolve(S.store.saveTrip(snap)).then(() => { if (S.pendingTrip[t.id] === t) delete S.pendingTrip[t.id]; }));
+  };
+  clearTimeout(S.timers['trip:' + t.id]);
+  if (debounced) S.timers['trip:' + t.id] = setTimeout(write, 500); else write();
+  renderTop(); renderFilters(); renderBoard();
+}
+function selectTrip(id) {
+  if (S.tripId === id) return;
+  S.tripId = id; S.events = {}; S.pending = {}; closeEditor();
+  try { localStorage.setItem('bookshelf-of-memories/last-trip', id); } catch {}
+  if (S.unsubEvents) { S.unsubEvents(); S.unsubEvents = null; }
+  if (!id) { renderAll(); return; }
+  S.unsubEvents = S.store.watchEvents(id, list => {
+    const next = {};
+    for (const e of list) next[e.id] = S.pending[e.id] || e;
+    for (const pid in S.pending) if (!next[pid] && S.pending[pid]) next[pid] = S.pending[pid];
+    S.events = next;
+    renderAll(); refreshEditor();
+  }, e => { S.lastError = 'Lost connection to shared trip'; setStatus(); });
+  renderAll();
+}
+function addDay(t, iso) {
+  if (!iso || t.days.includes(iso)) return;
+  t.days = [...t.days, iso].sort();
+  saveTrip(t);
+}
+function removeDay(t, iso) {
+  t.days = t.days.filter(d => d !== iso);
+  saveTrip(t);
+}
+
+/* ================= events ================= */
+function newEvent(date) {
+  const now = Date.now();
+  return { id: uid(), title: '', emoji: '', category: '', reservation: '', archived: false, notes: {}, rating: 0,
+    date: date || '', time: '', transport: { mins: null, mode: '' }, city: '', outfit: '', order: now, createdAt: now, updatedAt: now };
+}
+function createEvent(date, open = true) {
+  const ev = newEvent(date);
+  S.events[ev.id] = ev; S.pending[ev.id] = ev;
+  flushEvent(ev.id);
+  renderBoard();
+  if (open) openEditor(ev.id, { focusTitle: true });
+  return ev;
+}
+function patchEvent(id, changes, { immediate = false } = {}) {
+  const cur = S.events[id]; if (!cur) return;
+  const ev = { ...cur, ...changes, updatedAt: Date.now() };
+  S.events[id] = ev; S.pending[id] = ev;
+  clearTimeout(S.timers[id]);
+  if (immediate) flushEvent(id); else S.timers[id] = setTimeout(() => flushEvent(id), 450);
+  scheduleBoard();
+  if (immediate && S.editingId === id) renderEditor();
+  return ev;
+}
+function flushEvent(id) {
+  clearTimeout(S.timers[id]);
+  const ev = S.pending[id]; if (!ev) return;
+  const tripId = S.tripId;
+  track(Promise.resolve(S.store.saveEvent(tripId, clone(ev))).then(() => { if (S.pending[id] === ev) delete S.pending[id]; }));
+}
+function deleteEvent(id) {
+  clearTimeout(S.timers[id]);
+  delete S.pending[id]; delete S.events[id];
+  if (S.editingId === id) closeEditor();
+  track(Promise.resolve(S.store.deleteEvent(S.tripId, id)));
+  renderBoard();
+}
+function duplicateEvent(id) {
+  const src = S.events[id]; if (!src) return;
+  const ev = { ...clone(src), id: uid(), title: src.title ? src.title + ' (copy)' : '', order: src.order + 1, createdAt: Date.now(), updatedAt: Date.now() };
+  S.events[ev.id] = ev; S.pending[ev.id] = ev; flushEvent(ev.id);
+  renderBoard(); openEditor(ev.id);
+}
+const cmpEvents = (a, b) => {
+  if (!!a.time !== !!b.time) return a.time ? -1 : 1;
+  if (a.time && a.time !== b.time) return a.time < b.time ? -1 : 1;
+  return (a.order || 0) - (b.order || 0) || (a.createdAt || 0) - (b.createdAt || 0);
+};
+function eventsFor(date) {
+  const t = trip(); const days = new Set(t.days);
+  return Object.values(S.events)
+    .filter(e => (date === '' ? !days.has(e.date) : e.date === date))
+    .filter(e => S.showArchived || !e.archived)
+    .filter(e => !S.catFilter || e.category === S.catFilter)
+    .sort(cmpEvents);
+}
+
+/* ================= render: top ================= */
+function renderAll() { renderTop(); renderFilters(); renderBoard(); }
+function renderTop() {
+  const top = $('#top'); top.replaceChildren();
+  const t = trip();
+  const status = el('span', { class: 'status', id: 'status' }, el('i', { class: 'dot' }), el('span', { class: 'txt' }, ''));
+  if (!S.ready) { top.append(el('div'), el('div', { class: 'top-actions' }, status)); return; }
+  const name = t ? t.name : 'Bookshelf of Memories';
+  const count = t ? Object.values(S.events).filter(e => !e.archived).length : 0;
+  const sub = t ? (t.subtitle || `${fmtRange(t.days)} · ${t.days.length} day${t.days.length === 1 ? '' : 's'} · ${count} stop${count === 1 ? '' : 's'}`) : 'Plan each day as a board of cards';
+  top.append(
+    el('div', { class: 'brand' },
+      el('button', { class: 'trip-btn', onclick: e => tripMenu(e.currentTarget), 'aria-label': 'Switch trip' }, el('span', { class: 'trip-name' }, name), icon('chev')),
+      el('div', { class: 'trip-sub' }, sub)),
+    el('div', { class: 'top-actions' }, status,
+      t && el('button', { class: 'iconbtn', title: 'Trip settings', 'aria-label': 'Trip settings', onclick: () => settingsDialog() }, icon('gear'))));
+  setStatus();
+}
+function renderFilters() {
+  const f = $('#filters'); f.replaceChildren();
+  const t = trip(); if (!t) return;
+  const all = Object.values(S.events);
+  const cnt = id => all.filter(e => !e.archived && e.category === id).length;
+  const chip = (label, pressed, on, n) => el('button', { class: 'fchip', 'aria-pressed': String(pressed), onclick: on }, label, n != null && n > 0 && el('span', { class: 'n' }, n));
+  f.append(chip('All', !S.catFilter, () => { S.catFilter = ''; renderFilters(); renderBoard(); }));
+  for (const c of t.categories) {
+    const n = cnt(c.id); if (!n && S.catFilter !== c.id) continue;
+    f.append(chip(`${c.emoji} ${c.name}`, S.catFilter === c.id, () => { S.catFilter = S.catFilter === c.id ? '' : c.id; renderFilters(); renderBoard(); }, n));
+  }
+  const na = all.filter(e => e.archived).length;
+  if (na) f.append(chip(`Archived`, S.showArchived, () => { S.showArchived = !S.showArchived; renderFilters(); renderBoard(); }, na));
+}
+
+/* ================= render: board ================= */
+let boardRaf = 0;
+function scheduleBoard() { if (boardRaf) return; boardRaf = requestAnimationFrame(() => { boardRaf = 0; renderBoard(); }); }
+function renderBoard() {
+  const board = $('#board');
+  const t = trip();
+  if (!S.ready) { board.replaceChildren(el('div', { class: 'center' }, el('p', { style: 'color:var(--muted)' }, 'Opening your bookshelf…'))); return; }
+  if (!t) {
+    board.replaceChildren(el('div', { class: 'center' }, el('div', { class: 'hello' },
+      el('div', { style: 'font-size:44px' }, '📚'),
+      el('h1', {}, 'Bookshelf of Memories'),
+      el('p', {}, 'A board for every trip: one column per day, one card per stop, and the way you get between them.'),
+      el('button', { class: 'btn primary', onclick: () => newTripDialog() }, icon('plus'), 'Start a trip'))));
+    return;
+  }
+  const scrollLeft = board.scrollLeft;
+  const scrolls = {}; board.querySelectorAll('.col-body').forEach(b => scrolls[b.dataset.date] = b.scrollTop);
+  board.replaceChildren();
+  for (const d of t.days) board.append(renderColumn(t, d));
+  board.append(renderColumn(t, ''));
+  board.append(el('div', { class: 'col addday' }, el('div', { class: 'col-head' }, el('div', { class: 'dow', style: 'opacity:0' }, ' ')),
+    el('div', { class: 'col-body' }, el('button', { class: 'addday-btn', onclick: () => addDay(t, t.days.length ? addDays(t.days[t.days.length - 1], 1) : today()) }, icon('plus'), t.days.length ? 'Add a day' : 'Add first day'))));
+  board.scrollLeft = scrollLeft;
+  board.querySelectorAll('.col-body').forEach(b => { if (scrolls[b.dataset.date]) b.scrollTop = scrolls[b.dataset.date]; });
+}
+function renderColumn(t, date) {
+  const evs = eventsFor(date);
+  const isUn = date === '';
+  const col = el('div', { class: 'col' + (isUn ? ' unsched' : ''), dataset: { date } });
+  const head = el('div', { class: 'col-head' },
+    el('div', {},
+      el('div', { class: 'dow' }, isUn ? 'Unscheduled' : weekday(date)),
+      el('div', { class: 'date' }, isUn ? 'Ideas without a day yet' : fmtDate(date))),
+    el('div', { style: 'display:flex;align-items:center;gap:4px' },
+      el('span', { class: 'cnt' }, evs.length ? `${evs.length}` : ''),
+      !isUn && el('button', { class: 'menu', 'aria-label': 'Day options', onclick: e => dayMenu(e.currentTarget, t, date) }, icon('dots'))));
+  const body = el('div', { class: 'col-body', dataset: { date } });
+  evs.forEach((ev, i) => {
+    body.append(renderLink(ev, i === 0));
+    body.append(renderCard(ev));
+  });
+  if (!evs.length && isUn) body.append(el('div', { class: 'empty-col' }, 'Drag a card here to park it, or add one below.'));
+  body.append(el('button', { class: 'newcard', onclick: () => createEvent(date) }, icon('plus'), 'New'));
+  col.append(head, body);
+  return col;
+}
+function renderLink(ev, first) {
+  const tr = ev.transport || {};
+  const has = tr.mins || tr.mode;
+  if (!has && first) return el('div', { class: 'gap' });
+  const link = el('div', { class: 'link' + (has ? '' : ' empty') }, el('div', { class: 'line' }));
+  if (has) link.append(transportChip(tr, { onclick: e => { e.stopPropagation(); openEditor(ev.id, { focus: 'transport' }); }, role: 'button', title: 'Edit how you get here' }));
+  else link.append(el('button', { class: 'addtr', onclick: () => openEditor(ev.id, { focus: 'transport' }) }, '+ how do you get here?'));
+  return link;
+}
+function transportChip(tr, attrs = {}) {
+  const m = MODES[tr.mode];
+  const parts = [];
+  if (tr.mins) parts.push(`${tr.mins} min`);
+  if (m) parts.push(m.label);
+  const h = m ? m.h : 0;
+  return el('span', { class: 'chip' + (m ? ' tone' : ''), style: m ? `--h:${h}` : '', ...attrs }, m && el('span', { 'aria-hidden': 'true' }, m.icon), parts.join(' '));
+}
+function renderCard(ev) {
+  const t = trip();
+  const cat = catOf(ev.category);
+  const card = el('div', { class: 'card' + (ev.archived ? ' archived' : ''), dataset: { id: ev.id }, tabindex: '0', role: 'button',
+    onclick: e => { if (card._dragged) return; openEditor(ev.id); },
+    onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditor(ev.id); } } });
+  if (cat) card.append(el('div', { class: 'card-cat', style: `--h:${cat.h}` }, el('i'), cat.name));
+  const grip = el('span', { class: 'grip', title: 'Drag to another day', 'aria-hidden': 'true' }, icon('grip'));
+  card.append(el('div', { class: 'card-head' },
+    el('span', { class: 'card-emoji' + (ev.emoji ? '' : ' none') }, ev.emoji || (cat ? cat.emoji : '▫️')),
+    el('div', { class: 'title' + (ev.title ? '' : ' untitled') }, ev.title || 'Untitled'),
+    grip));
+  if (ev.reservation) card.append(el('div', { class: 'card-res' }, ev.reservation));
+  const meta = el('div', { class: 'card-meta' });
+  if (ev.time) meta.append(el('span', { class: 'chip tone', style: `--h:${TIME_H}` }, fmtTime(ev.time)));
+  if (ev.rating) meta.append(el('span', { class: 'stars', title: `${ev.rating} of 5` }, '★'.repeat(ev.rating) + '☆'.repeat(5 - ev.rating)));
+  if (meta.children.length) card.append(meta);
+  const travelers = t.travelers.length ? t.travelers : ['Notes'];
+  for (const who of travelers) {
+    const txt = (ev.notes || {})[who]; if (!txt) continue;
+    card.append(el('div', { class: 'note' }, el('span', { class: 'who', title: who === 'Notes' ? 'Notes' : `${who}'s notes` }, initials(who)), el('span', { class: 'txt' }, txt)));
+  }
+  if (ev.city || ev.outfit) {
+    const foot = el('div', { class: 'card-foot' });
+    if (ev.city) foot.append(el('span', { class: 'chip' }, '📍 ' + ev.city));
+    if (ev.outfit) foot.append(el('span', { class: 'outfit' }, '👚 ', ev.outfit));
+    card.append(foot);
+  }
+  attachDrag(card, grip, ev);
+  return card;
+}
+
+/* ================= drag & drop ================= */
+function attachDrag(card, grip, ev) {
+  card.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const onGrip = grip.contains(e.target);
+    if (e.pointerType !== 'mouse' && !onGrip) return; // touch: scroll unless on the grip
+    e.preventDefault();
+    const board = $('#board');
+    const startX = e.clientX, startY = e.clientY, rect = card.getBoundingClientRect();
+    let ghost = null, raf = 0, dir = 0, over = null;
+    card.setPointerCapture(e.pointerId);
+    const loop = () => { if (dir) board.scrollLeft += dir * 12; raf = requestAnimationFrame(loop); };
+    const begin = () => {
+      ghost = card.cloneNode(true); ghost.className = 'card ghost';
+      ghost.style.width = rect.width + 'px'; ghost.style.left = rect.left + 'px'; ghost.style.top = rect.top + 'px';
+      document.body.append(ghost); card.classList.add('dragging'); loop();
+    };
+    const move = m => {
+      if (!ghost) { if (Math.hypot(m.clientX - startX, m.clientY - startY) < 5) return; begin(); }
+      ghost.style.transform = `translate(${m.clientX - startX}px,${m.clientY - startY}px) rotate(1.5deg)`;
+      const b = board.getBoundingClientRect();
+      dir = m.clientX < b.left + 44 ? -1 : m.clientX > b.right - 44 ? 1 : 0;
+      const col = document.elementsFromPoint(m.clientX, m.clientY).find(n => n.classList && n.classList.contains('col') && n.dataset.date !== undefined);
+      if (col !== over) { over && over.classList.remove('drop'); over = col || null; over && over.classList.add('drop'); }
+    };
+    const end = m => {
+      card.removeEventListener('pointermove', move); card.removeEventListener('pointerup', end); card.removeEventListener('pointercancel', end);
+      try { card.releasePointerCapture(e.pointerId); } catch {}
+      cancelAnimationFrame(raf);
+      if (!ghost) return; // a plain tap or click: the card's click handler opens the editor
+      card._dragged = true; setTimeout(() => { card._dragged = false; }, 0);
+      ghost.remove(); card.classList.remove('dragging');
+      if (over) {
+        over.classList.remove('drop');
+        const date = over.dataset.date;
+        const changes = {};
+        if (date !== ev.date) changes.date = date;
+        if (!ev.time) { // untimed cards keep a manual order
+          const cards = [...over.querySelectorAll('.card:not(.dragging)')].map(c => S.events[c.dataset.id]).filter(x => x && !x.time);
+          const rects = [...over.querySelectorAll('.card:not(.dragging)')].filter(c => S.events[c.dataset.id] && !S.events[c.dataset.id].time).map(c => c.getBoundingClientRect());
+          let idx = rects.findIndex(r => m.clientY < r.top + r.height / 2); if (idx < 0) idx = cards.length;
+          const before = cards[idx - 1], after = cards[idx];
+          changes.order = before && after ? (before.order + after.order) / 2 : before ? before.order + 1000 : after ? after.order - 1000 : Date.now();
+        }
+        if (Object.keys(changes).length) patchEvent(ev.id, changes, { immediate: true });
+      }
+    };
+    card.addEventListener('pointermove', move); card.addEventListener('pointerup', end); card.addEventListener('pointercancel', end);
+  });
+}
+
+/* ================= editor ================= */
+let editorRendered = '';
+function openEditor(id, opts = {}) {
+  S.editingId = id;
+  $('#editor').classList.add('open'); $('#backdrop').classList.add('open');
+  renderEditor();
+  const ed = $('#editor');
+  if (opts.focusTitle) setTimeout(() => $('.ed-title', ed)?.focus(), 30);
+  if (opts.focus === 'transport') setTimeout(() => { const f = $('#f-mins', ed); f?.scrollIntoView({ block: 'center' }); f?.focus(); }, 30);
+}
+function closeEditor() {
+  S.editingId = null; editorRendered = '';
+  $('#editor').classList.remove('open'); $('#backdrop').classList.remove('open');
+  $('#editor').replaceChildren();
+}
+function refreshEditor() {
+  if (!S.editingId) return;
+  const ev = S.events[S.editingId];
+  if (!ev) { closeEditor(); return; }
+  if (JSON.stringify(ev) === editorRendered) return;
+  const ed = $('#editor');
+  if (ed.contains(document.activeElement) && document.activeElement !== ed) return; // don't clobber typing
+  renderEditor();
+}
+function autosize(ta) { ta.style.height = 'auto'; ta.style.height = Math.max(38, ta.scrollHeight + 2) + 'px'; }
+function renderEditor() {
+  const ed = $('#editor'); const ev = S.events[S.editingId]; const t = trip();
+  if (!ev || !t) { closeEditor(); return; }
+  editorRendered = JSON.stringify(ev);
+  const scrollTop = $('.ed-scroll', ed)?.scrollTop || 0;
+  ed.replaceChildren();
+  const cat = catOf(ev.category);
+  const prop = (ic, label, ...ctrl) => el('div', { class: 'prop' }, el('div', { class: 'prop-k' }, icon(ic), el('span', {}, label)), el('div', { class: 'prop-v' }, ...ctrl));
+  const text = (key, ph, multi) => {
+    const n = el(multi ? 'textarea' : 'input', { value: ev[key] || '', placeholder: ph, rows: multi ? 1 : null,
+      oninput: e => { patchEvent(ev.id, { [key]: e.target.value }); if (multi) autosize(e.target); },
+      onblur: () => flushEvent(ev.id) });
+    if (multi) requestAnimationFrame(() => autosize(n));
+    return n;
+  };
+
+  const emojiBtn = el('button', { class: 'emoji-btn' + (ev.emoji ? ' has' : ''), title: 'Choose an icon', 'aria-label': 'Choose an icon', onclick: e => emojiPicker(e.currentTarget, ev.id) }, ev.emoji || (cat ? cat.emoji : '▫️'));
+  const title = el('input', { class: 'ed-title', value: ev.title, placeholder: 'Untitled', oninput: e => patchEvent(ev.id, { title: e.target.value }), onblur: () => flushEvent(ev.id),
+    onkeydown: e => { if (e.key === 'Enter') e.target.blur(); } });
+
+  const catSel = el('select', { onchange: e => patchEvent(ev.id, { category: e.target.value }, { immediate: true }) },
+    el('option', { value: '' }, 'None'), t.categories.map(c => el('option', { value: c.id, selected: c.id === ev.category }, `${c.emoji} ${c.name}`)));
+
+  const resv = el('input', { value: ev.reservation, placeholder: 'Booked, need to book, walk-in…', list: 'resv-list', oninput: e => patchEvent(ev.id, { reservation: e.target.value }), onblur: () => flushEvent(ev.id) });
+  const resvList = el('datalist', { id: 'resv-list' }, RESERVATION_HINTS.map(h => el('option', { value: h })));
+
+  const archive = el('label', { class: 'switch' }, el('input', { type: 'checkbox', checked: !!ev.archived, onchange: e => patchEvent(ev.id, { archived: e.target.checked }, { immediate: true }) }), el('span', { style: 'color:var(--muted);font-size:13px' }, ev.archived ? 'Hidden from the board' : 'Showing on the board'));
+
+  const travelers = t.travelers.length ? t.travelers : ['Notes'];
+  const noteRows = travelers.map(who => {
+    const ta = el('textarea', { rows: 1, value: (ev.notes || {})[who] || '', placeholder: who === 'Notes' ? 'Notes' : `What ${who} wants to remember`,
+      oninput: e => { patchEvent(ev.id, { notes: { ...(S.events[ev.id].notes || {}), [who]: e.target.value } }); autosize(e.target); }, onblur: () => flushEvent(ev.id) });
+    requestAnimationFrame(() => autosize(ta));
+    return prop('person', who === 'Notes' ? 'Notes' : `${who}'s notes`, ta);
+  });
+
+  const rating = el('div', { class: 'rating' },
+    [1, 2, 3, 4, 5].map(n => el('button', { class: n <= ev.rating ? 'on' : '', 'aria-label': `${n} star${n > 1 ? 's' : ''}`, onclick: () => patchEvent(ev.id, { rating: ev.rating === n ? 0 : n }, { immediate: true }) }, '★')),
+    ev.rating ? el('button', { class: 'clear', onclick: () => patchEvent(ev.id, { rating: 0 }, { immediate: true }) }, 'Clear') : null);
+
+  const date = el('input', { type: 'date', value: ev.date, onchange: e => { const v = e.target.value; patchEvent(ev.id, { date: v }, { immediate: true }); if (v && !t.days.includes(v)) addDay(t, v); } });
+  const time = el('input', { type: 'time', value: ev.time, onchange: e => patchEvent(ev.id, { time: e.target.value }, { immediate: true }) });
+
+  const tr = ev.transport || { mins: null, mode: '' };
+  const mins = el('input', { id: 'f-mins', type: 'number', min: 0, step: 1, inputmode: 'numeric', placeholder: 'min', value: tr.mins ?? '',
+    oninput: e => patchEvent(ev.id, { transport: { ...S.events[ev.id].transport, mins: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value, 10) || 0) } }), onblur: () => flushEvent(ev.id) });
+  const mode = el('select', { onchange: e => patchEvent(ev.id, { transport: { ...S.events[ev.id].transport, mode: e.target.value } }, { immediate: true }) },
+    el('option', { value: '' }, 'How?'), Object.entries(MODES).map(([k, m]) => el('option', { value: k, selected: k === tr.mode }, `${m.icon} ${m.label}`)));
+
+  const cities = [...new Set([...(t.cities || []), ...Object.values(S.events).map(e => e.city).filter(Boolean)])];
+  const city = el('input', { value: ev.city, placeholder: 'City', list: 'city-list', oninput: e => patchEvent(ev.id, { city: e.target.value }), onblur: () => flushEvent(ev.id) });
+  const cityList = el('datalist', { id: 'city-list' }, cities.map(c => el('option', { value: c })));
+
+  const dayName = ev.date && t.days.includes(ev.date) ? `${weekday(ev.date)}, ${fmtDate(ev.date)}` : (ev.date ? 'Not one of this trip\'s days' : 'Unscheduled');
+
+  ed.append(
+    el('div', { class: 'ed-top' },
+      el('span', { style: 'color:var(--muted);font-size:12px;padding-left:8px' }, dayName),
+      el('button', { class: 'iconbtn', 'aria-label': 'Close', onclick: closeEditor }, icon('x'))),
+    el('div', { class: 'ed-scroll' },
+      el('div', { class: 'ed-hero' }, emojiBtn, title),
+      prop('tag', 'Category', catSel),
+      prop('book', 'Reservation', resv, resvList),
+      prop('archive', 'Archive', archive),
+      ...noteRows,
+      prop('star', 'Rating', rating),
+      prop('cal', 'Date', date),
+      prop('clock', 'Time', time),
+      prop('route', 'Transportation', el('div', { class: 'row' }, mins, mode), el('div', { class: 'ed-hint' }, 'How you get here from the previous card')),
+      prop('pin', 'City', city, cityList),
+      prop('shirt', 'Outfit', text('outfit', 'What to wear', true)),
+      el('div', { class: 'ed-foot' },
+        el('button', { class: 'btn', onclick: () => duplicateEvent(ev.id) }, icon('copy'), 'Duplicate'),
+        el('button', { class: 'btn danger', style: 'margin-left:auto', onclick: () => { if (confirm(`Delete “${ev.title || 'Untitled'}”?`)) deleteEvent(ev.id); } }, icon('trash'), 'Delete'))));
+  $('.ed-scroll', ed).scrollTop = scrollTop;
+}
+function emojiPicker(anchor, id) {
+  closePop();
+  const pop = el('div', { class: 'emoji-pop' });
+  const inp = el('input', { placeholder: 'Type or paste any emoji', maxlength: 8, oninput: e => { const v = [...e.target.value].slice(-1)[0] || ''; if (v && !/[\w\s]/.test(v)) { patchEvent(id, { emoji: v }, { immediate: true }); closePop(); renderEditor(); } } });
+  const grid = el('div', { class: 'emoji-grid' }, EMOJI.map(em => el('button', { onclick: () => { patchEvent(id, { emoji: em }, { immediate: true }); closePop(); renderEditor(); } }, em)));
+  pop.append(inp, grid, el('button', { class: 'btn', style: 'margin-top:8px;width:100%;justify-content:center', onclick: () => { patchEvent(id, { emoji: '' }, { immediate: true }); closePop(); renderEditor(); } }, 'Remove icon'));
+  placePop(pop, anchor);
+  setTimeout(() => inp.focus(), 20);
+}
+
+/* ================= popovers ================= */
+let openPop = null;
+function closePop() { if (openPop) { openPop.remove(); openPop = null; document.removeEventListener('pointerdown', popOutside, true); } }
+function popOutside(e) { if (openPop && !openPop.contains(e.target)) closePop(); }
+function placePop(pop, anchor) {
+  document.body.append(pop); openPop = pop;
+  const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  let left = Math.min(r.left, window.innerWidth - w - 12), top = r.bottom + 6;
+  if (top + h > window.innerHeight - 12) top = Math.max(12, r.top - h - 6);
+  pop.style.left = Math.max(12, left) + 'px'; pop.style.top = top + 'px';
+  setTimeout(() => document.addEventListener('pointerdown', popOutside, true), 0);
+}
+function menu(anchor, items) {
+  closePop();
+  const pop = el('div', { class: 'pop', role: 'menu' });
+  for (const it of items) {
+    if (it === 'hr') { pop.append(el('hr')); continue; }
+    if (it.label && !it.onclick) { pop.append(el('div', { class: 'lbl' }, it.label)); continue; }
+    pop.append(el('button', { class: it.danger ? 'danger' : '', role: 'menuitem', onclick: () => { closePop(); it.onclick(); } }, el('span', { class: 'chk' }, it.checked ? '✓' : ''), it.label));
+  }
+  placePop(pop, anchor);
+}
+function tripMenu(anchor) {
+  const trips = Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt);
+  menu(anchor, [
+    { label: 'Trips' },
+    ...trips.map(t => ({ label: t.name || 'Untitled trip', checked: t.id === S.tripId, onclick: () => selectTrip(t.id) })),
+    'hr',
+    { label: '+ New trip', onclick: () => newTripDialog() },
+    trip() && { label: 'Trip settings', onclick: () => settingsDialog() },
+  ].filter(Boolean));
+}
+function dayMenu(anchor, t, date) {
+  const n = Object.values(S.events).filter(e => e.date === date).length;
+  menu(anchor, [
+    { label: `${weekday(date)}, ${fmtDate(date)}` },
+    { label: 'Add a card', onclick: () => createEvent(date) },
+    { label: 'Add a day before', onclick: () => addDay(t, addDays(date, -1)) },
+    { label: 'Add a day after', onclick: () => addDay(t, addDays(date, 1)) },
+    'hr',
+    { label: n ? `Remove day (${n} card${n === 1 ? '' : 's'} move to Unscheduled)` : 'Remove day', danger: true, onclick: () => { if (!n || confirm(`Remove ${fmtDate(date)}? Its ${n} card${n === 1 ? '' : 's'} will move to Unscheduled.`)) removeDay(t, date); } },
+  ]);
+}
+
+/* ================= dialogs ================= */
+function dialog(content) {
+  const d = $('#dlg'); d.replaceChildren(el('div', { class: 'dlg' }, ...content)); d.showModal(); return d;
+}
+function newTripDialog() {
+  const prev = trip();
+  const name = el('input', { placeholder: 'e.g. London, Tokyo & Bangkok', autofocus: true });
+  const start = el('input', { type: 'date', value: today() });
+  const days = el('input', { type: 'number', min: 1, max: 60, value: 4 });
+  const trav = el('input', { value: prev ? prev.travelers.join(', ') : 'Ryan, Katie', placeholder: 'Ryan, Katie' });
+  const cities = el('input', { placeholder: 'e.g. London' });
+  const d = dialog([
+    el('h2', {}, 'New trip'),
+    el('div', { class: 'field' }, el('label', {}, 'Trip name'), name),
+    el('div', { class: 'fields-2' }, el('div', { class: 'field' }, el('label', {}, 'First day'), start), el('div', { class: 'field' }, el('label', {}, 'Number of days'), days)),
+    el('div', { class: 'field' }, el('label', {}, 'Travelers'), trav, el('span', { class: 'hint' }, 'Each traveler gets their own notes on every card.')),
+    el('div', { class: 'field' }, el('label', {}, 'Cities'), cities, el('span', { class: 'hint' }, 'Comma-separated. You can add more later.')),
+    el('div', { class: 'dlg-actions' },
+      el('button', { class: 'btn', onclick: () => d.close() }, 'Cancel'),
+      el('button', { class: 'btn primary', onclick: () => {
+        const t = newTrip({ name: name.value.trim(), start: start.value || today(), nDays: Math.min(60, Math.max(1, parseInt(days.value, 10) || 1)),
+          travelers: splitList(trav.value), cities: splitList(cities.value) });
+        d.close(); saveTrip(t); selectTrip(t.id);
+      } }, 'Create trip')),
+  ]);
+  setTimeout(() => name.focus(), 30);
+}
+const splitList = s => s.split(',').map(x => x.trim()).filter(Boolean);
+function settingsDialog() {
+  const t = trip(); if (!t) return;
+  const save = () => saveTrip(t, { debounced: true });
+  const name = el('input', { value: t.name, oninput: e => { t.name = e.target.value; save(); } });
+  const sub = el('input', { value: t.subtitle, placeholder: 'Shown under the name (optional)', oninput: e => { t.subtitle = e.target.value; save(); } });
+  const trav = el('input', { value: t.travelers.join(', '), oninput: e => { t.travelers = splitList(e.target.value); save(); } });
+  const cities = el('input', { value: (t.cities || []).join(', '), oninput: e => { t.cities = splitList(e.target.value); save(); } });
+  const list = el('div', { class: 'catlist' });
+  const renderCats = () => {
+    list.replaceChildren(...t.categories.map(c => el('div', { class: 'catrow' },
+      el('input', { class: 'em', value: c.emoji, maxlength: 4, 'aria-label': 'Emoji', oninput: e => { c.emoji = [...e.target.value].slice(-1)[0] || ''; save(); } }),
+      el('input', { value: c.name, 'aria-label': 'Category name', oninput: e => { c.name = e.target.value; save(); } }),
+      el('button', { class: 'del', 'aria-label': `Remove ${c.name}`, onclick: () => { t.categories = t.categories.filter(x => x !== c); save(); renderCats(); } }, icon('x')))));
+  };
+  renderCats();
+  const addCat = el('button', { class: 'btn', onclick: () => { t.categories.push({ id: uid(), name: 'New category', emoji: '✨', h: Math.floor(Math.random() * 360) }); save(); renderCats(); list.lastChild.children[1].focus(); list.lastChild.children[1].select(); } }, icon('plus'), 'Add category');
+  const d = dialog([
+    el('h2', {}, 'Trip settings'),
+    el('div', { class: 'field' }, el('label', {}, 'Trip name'), name),
+    el('div', { class: 'field' }, el('label', {}, 'Subtitle'), sub),
+    el('div', { class: 'field' }, el('label', {}, 'Travelers'), trav, el('span', { class: 'hint' }, 'Comma-separated. Each traveler gets a notes field on every card.')),
+    el('div', { class: 'field' }, el('label', {}, 'Cities'), cities, el('span', { class: 'hint' }, 'Suggested in the City field on each card.')),
+    el('div', { class: 'field' }, el('label', {}, 'Categories'), list, el('div', {}, addCat)),
+    el('div', { class: 'dlg-actions' },
+      el('button', { class: 'btn danger', style: 'margin-right:auto', onclick: () => {
+        if (confirm(`Delete the trip “${t.name}” and all of its cards? This cannot be undone.`)) {
+          d.close(); const id = t.id; delete S.trips[id]; delete S.pendingTrip[id];
+          const next = Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt)[0];
+          selectTrip(next ? next.id : null);
+          track(Promise.resolve(S.store.deleteTrip(id))); renderAll();
+        } } }, icon('trash'), 'Delete trip'),
+      el('button', { class: 'btn primary', onclick: () => { clearTimeout(S.timers['trip:' + t.id]); saveTrip(t); d.close(); } }, 'Done')),
+  ]);
+}
+
+/* ================= sample trip (first run on this device) ================= */
+function sampleTrip() {
+  const t = newTrip({ name: 'London', start: '2026-08-22', nDays: 4, travelers: ['Ryan', 'Katie'], cities: ['London'] });
+  t.subtitle = '';
+  let o = 0;
+  const E = (date, time, title, emoji, category, extra = {}) => ({ ...newEvent(date), time, title, emoji, category, order: ++o, ...extra, transport: { mins: null, mode: '', ...(extra.transport || {}) } });
+  const evs = [
+    E('2026-08-22', '10:20', 'Arrive in London', '🛬', 'transit', { city: 'London' }),
+    E('2026-08-22', '11:30', 'Hotel: Great Scotland Yard Hotel', '🏠', 'hotel', { notes: { Katie: 'Check-in is at 3pm' }, city: 'London' }),
+    E('2026-08-22', '12:00', 'Lunch? Kiln? Malatang?', '', 'food'),
+    E('2026-08-22', '14:00', 'Big Ben', '🏰', 'sights', { transport: { mins: 11, mode: 'walk' } }),
+    E('2026-08-22', '17:30', 'Dishoom - Covent Garden', '🍛', 'food', { reservation: 'Booked', transport: { mins: 12, mode: 'subway' } }),
+    E('2026-08-23', '12:00', 'Sch…', '🐔', 'food', { reservation: 'Booked', transport: { mins: 38, mode: 'subway' } }),
+    E('2026-08-23', '17:30', 'Gymkhana', '🍗', 'food', { reservation: 'Booked', transport: { mins: 22, mode: 'walk' } }),
+    E('2026-08-24', '12:00', 'Borough Market', '🥪', 'food', { notes: { Katie: 'Dorset Oysters Bar, The Ginger Pig, The Black Pig, Bread Ahead' }, transport: { mins: 18, mode: 'subway' } }),
+    E('2026-08-24', '14:00', 'Glass flower workshop', '🌺', 'activity', { reservation: 'Booked, 2.5 hrs', transport: { mins: 30, mode: 'walk' } }),
+    E('2026-08-24', '17:00', 'Relax at Hotel & Get Ready', '👚', 'rest', { transport: { mins: 30, mode: 'walk' } }),
+    E('2026-08-24', '18:30', 'Osteria Angelina', '🐚', 'food', { reservation: 'Booked', transport: { mins: 25, mode: 'subway' } }),
+    E('2026-08-25', '12:00', 'Darwin Brasserie · Sky Garden', '🏙️', 'food', { reservation: 'Booked', notes: { Katie: 'Sky Garden restaurant' } }),
+    E('2026-08-25', '18:00', 'Mo…', '🥩', 'food', { reservation: 'Booked', transport: { mins: 20, mode: 'walk' } }),
+    E('2026-08-25', '20:00', 'Scarfes Bar', '🍸', 'drinks', { reservation: 'Booked', transport: { mins: 4, mode: 'walk' } }),
+    E('2026-08-25', '', 'Or…', '🍷', 'drinks', { transport: { mins: 11, mode: 'walk' } }),
+  ];
+  return { trip: t, events: evs };
+}
+window.__sampleTrip = sampleTrip;
+
+/* ================= boot ================= */
+async function boot() {
+  renderTop(); renderBoard();
+  $('#backdrop').addEventListener('click', closeEditor);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (openPop) closePop(); else if (S.editingId && !$('#dlg').open) closeEditor(); } });
+  window.addEventListener('beforeunload', () => { for (const id in S.pending) flushEvent(id); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) for (const id in S.pending) flushEvent(id); });
+
+  let db = null;
+  try { if (window.claude && typeof window.claude.use === 'function') db = await window.claude.use('db'); } catch (e) { console.warn(e); }
+  S.store = db ? new DbStore(db) : new LocalStore();
+  S.backend = db ? 'shared' : 'local';
+
+  let first = true;
+  S.store.watchTrips(list => {
+    const next = {};
+    for (const t of list) next[t.id] = S.pendingTrip[t.id] || t;
+    for (const id in S.pendingTrip) if (!next[id]) next[id] = S.pendingTrip[id];
+    S.trips = next;
+    if (first) {
+      first = false; S.ready = true;
+      if (!list.length && S.backend === 'local') {
+        const { trip: t, events } = sampleTrip();
+        S.trips[t.id] = t; track(S.store.saveTrip(t)); for (const e of events) track(S.store.saveEvent(t.id, e));
+      }
+      let last = null; try { last = localStorage.getItem('bookshelf-of-memories/last-trip'); } catch {}
+      const pick = S.trips[last] ? last : (Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt)[0] || {}).id || null;
+      selectTrip(pick);
+    } else if (S.tripId && !S.trips[S.tripId]) {
+      const nxt = Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt)[0];
+      selectTrip(nxt ? nxt.id : null);
+    }
+    renderAll();
+  }, e => { S.lastError = 'Could not open the shared trip'; S.ready = true; renderAll(); });
+}
+boot();
+})();
+</script>
+</body>
+</html>

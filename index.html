@@ -266,8 +266,20 @@ dialog::backdrop{background:rgba(27,43,94,.4)}
 .hello h1{font:300 italic 72px/.9 var(--script);margin:0;text-wrap:balance}
 .hello p{color:var(--ink-70);margin:0;font:300 15px/1.8 var(--mincho)}
 
+/* scroll cue and the collapsed header bar (phones) */
+.scroll-cue{display:none;position:absolute;bottom:28px;left:50%;transform:translateX(-50%);flex-direction:column;align-items:center;gap:8px;opacity:.5;color:var(--ink);font:400 9px/1 var(--sans);letter-spacing:.3em;text-transform:uppercase;animation:bounce 1s infinite;z-index:2;padding:8px;min-width:44px;min-height:44px}
+.scroll-cue svg{width:14px;height:14px}
+@keyframes bounce{0%,100%{transform:translate(-50%,-25%);animation-timing-function:cubic-bezier(.8,0,1,1)}50%{transform:translate(-50%,0);animation-timing-function:cubic-bezier(0,0,.2,1)}}
+.trip-name[role="button"]{cursor:pointer}
 /* ---------- phones ---------- */
 @media (max-width:760px){
+  .scroll-cue{display:flex}
+  .hero-collapsed .top{position:sticky;top:0;z-index:25;min-height:0;padding:14px var(--sp-md);padding-top:max(14px,env(safe-area-inset-top));justify-content:center;border-bottom:1px solid var(--ink-10)}
+  .hero-collapsed .top::before,.hero-collapsed .top-row,.hero-collapsed .trip-kicker,.hero-collapsed .trip-sub,.hero-collapsed .scroll-cue{display:none}
+  .hero-collapsed .trip-header{animation:none;margin:0}
+  .hero-collapsed .trip-name{font-size:24px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100vw - 32px)}
+  .hero-collapsed .trip-name br{display:none}
+  .hero-collapsed .trip-name em::before{content:" "}
   .top{padding:88px var(--sp-md) 40px;min-height:320px}
   .top-row{padding:18px var(--sp-lg)}
   .top-actions .iconbtn{display:none}
@@ -282,7 +294,6 @@ dialog::backdrop{background:rgba(27,43,94,.4)}
   .col-head .dow{font-size:30px}
   .newcard{margin-left:0}
   .empty-col{padding-left:0}
-  .bottom-nav{display:flex}
   .editor{width:calc(100vw - 16px);max-height:calc(100dvh - 24px)}
   .ed-scroll{padding:var(--sp-xs) var(--sp-lg) calc(var(--sp-lg) + env(safe-area-inset-bottom))}
   .prop,.dlg .prop{grid-template-columns:1fr;gap:6px}
@@ -360,6 +371,7 @@ const ICONS = {
   profile: '<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>',
   plusfill: '<svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>',
   arrow: '<svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+  arrowdown: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
   dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   grip: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
@@ -983,12 +995,10 @@ function renderTop() {
       el('div', { class: 'top-actions' }, status,
         t && el('button', { class: 'iconbtn', title: 'Add a card', 'aria-label': 'Add a card', onclick: () => addCardDialog(t.days[0] || '') }, icon('plus')),
         t && el('button', { class: 'iconbtn', title: 'Trip settings', 'aria-label': 'Trip settings', onclick: () => settingsDialog() }, icon('gear')))),
-    t && el('div', { class: 'trip-header' }, el('h2', { class: 'trip-kicker', style: 'margin:0' }, fmtRange(t.days)), el('h1', { class: 'trip-name', style: 'margin:0' }, ...fancyName(name)), el('p', { class: 'trip-sub', style: 'margin-bottom:0' }, sub)));
-  const nav = $('#bottomnav'); nav.replaceChildren();
-  if (t) nav.append(
-    el('button', { class: 'nav-item active', 'aria-label': 'Trips', onclick: e => tripMenu(e.currentTarget) }, icon('home')),
-    el('button', { class: 'nav-item', 'aria-label': 'Add a card', onclick: () => addCardDialog(t.days[0] || '') }, icon('plusfill')),
-    el('button', { class: 'nav-item', 'aria-label': 'Trip settings', onclick: () => settingsDialog() }, icon('profile')));
+    t && el('div', { class: 'trip-header' }, el('h2', { class: 'trip-kicker', style: 'margin:0' }, fmtRange(t.days)),
+      el('h1', { class: 'trip-name', style: 'margin:0', role: 'button', tabindex: '0', title: 'Trips and settings', onclick: e => tripMenu(e.currentTarget) }, ...fancyName(name)),
+      el('p', { class: 'trip-sub', style: 'margin-bottom:0' }, sub)),
+    t && el('button', { class: 'scroll-cue', 'aria-label': 'Collapse the header', onclick: collapseHero }, el('span', {}, 'Scroll'), icon('arrowdown')));
   setStatus();
 }
 /* "Bangkok & Tokyo" sets as Bangkok & <em>Tokyo</em>, like the design's two-line title. */
@@ -1574,6 +1584,9 @@ window.__sampleTrip = sampleTrip;
 window.__parseMapsLink = parseMapsLink;
 
 /* ================= boot ================= */
+const HERO_LS = 'bookshelf-of-memories/hero-collapsed';
+function collapseHero() { document.body.classList.add('hero-collapsed'); LS.set(HERO_LS, '1'); }
+if (LS.get(HERO_LS)) document.body.classList.add('hero-collapsed');
 async function boot() {
   renderTop(); renderBoard();
   $('#backdrop').addEventListener('click', closeEditor);

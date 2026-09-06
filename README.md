@@ -26,6 +26,8 @@ The row between two cards shows how long it takes to get from the card above to 
 
 Any row can be overridden by hand from the card's Transportation field.
 
+**Short links.** Google's Share button copies the place name next to a short maps.app.goo.gl link. Paste both together and the name is read from the text. A short link pasted on its own can't be read by a web page, because browsers hide where redirects go. `resolver.gs` is a small Google Apps Script that follows the redirect for you. Deploy it once (instructions are in the file) and paste its URL into trip settings under "Short-link helper URL", and bare short links fill in the name too.
+
 Place names are looked up the same way: Google Places with a key, OpenStreetMap (Nominatim) without one, and a full Google Maps link always saves the name and pin on its own.
 
 The API key is entered in trip settings and stays on that device. Enable the Maps JavaScript, Places (New), Directions and Geocoding APIs for it, and restrict it to your site.

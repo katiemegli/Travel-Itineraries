@@ -370,6 +370,10 @@ const EMOJI = '🥪 🍜 🍣 🍛 🍕 🍔 🥐 🍰 🍦 ☕ 🍵 🍷 🍸 �
 const MAPS_KEY_LS = 'bookshelf-of-memories/maps-key';
 // Browser key for Google Maps, restricted in Google Cloud to this site's address. A key entered in trip settings overrides it on that device.
 const DEFAULT_MAPS_KEY = 'AIzaSyDuTwpPsxAUJLDjZVlwW1O07VozqSjrlNg';
+// Short Google Maps links (maps.app.goo.gl) only reveal their place by redirecting, which browsers hide from pages.
+// A tiny helper (see resolver.gs) follows the redirect server-side and returns the full link. Paste its URL in trip settings, or set it here.
+const RESOLVER_LS = 'bookshelf-of-memories/resolver-url';
+const DEFAULT_RESOLVER_URL = '';
 
 /* ================= storage backends ================= */
 class LocalStore {
@@ -635,6 +639,16 @@ async function nearbyPlace(lat, lng) {
     return { name: p.displayName, address: p.formattedAddress || '', placeId: p.id || '' };
   } catch (e) { console.warn(e); return null; }
 }
+const resolverUrl = () => LS.get(RESOLVER_LS) || DEFAULT_RESOLVER_URL;
+async function expandShortLink(url) {
+  const base = resolverUrl(); if (!base || !osmOk()) return '';
+  try {
+    const r = await fetch(base + (base.includes('?') ? '&' : '?') + 'url=' + encodeURIComponent(url));
+    if (!r.ok) return '';
+    const j = await r.json();
+    return j && typeof j.url === 'string' && /^https?:\/\//.test(j.url) ? j.url : '';
+  } catch (e) { console.warn('short-link helper unreachable', e); return ''; }
+}
 /* Google's Share button copies "Place name" + a short link together; pull the two apart. */
 function splitShare(text) {
   const m = String(text || '').match(/https?:\/\/\S+/); if (!m) return null;
@@ -659,7 +673,12 @@ async function enrichPlace(place, city) {
 async function resolveQuery(text, city) {
   text = (text || '').trim(); if (!text) return { title: '', place: null };
   const share = splitShare(text);
-  const link = share ? parseMapsLink(share.url) : null;
+  let link = share ? parseMapsLink(share.url) : null;
+  if (link && link.short && !link.name && !share.name) {               // bare short link: ask the helper where it goes
+    const full = await expandShortLink(link.url);
+    const parsed = full && parseMapsLink(full);
+    if (parsed && !parsed.short) link = { ...parsed, url: link.url };
+  }
   if (link) {
     if (!link.name && share.name) link.name = share.name;              // "Borough Market https://maps.app.goo.gl/…"
     const place = { name: link.name, address: '', lat: link.lat, lng: link.lng, url: link.url, placeId: '', source: 'link' };
@@ -1323,6 +1342,10 @@ function settingsDialog() {
     el('div', { class: 'field' }, el('label', {}, 'Categories'), el('span', { class: 'hint' }, 'Top to bottom is also the order for cards that have no time.'), list, el('div', {}, addCat)),
     el('div', { class: 'field' }, el('label', {}, 'Google Maps API key'), keyInp, mapsStatus,
       el('span', { class: 'hint' }, 'Enable the Maps JavaScript, Places (New), Directions and Geocoding APIs for the key, and restrict it to this site.')),
+    el('div', { class: 'field' }, el('label', {}, 'Short-link helper URL'),
+      el('input', { value: LS.get(RESOLVER_LS) || '', placeholder: DEFAULT_RESOLVER_URL ? 'Using the built-in helper. Paste one to override on this device.' : 'https://script.google.com/macros/s/…/exec', autocomplete: 'off',
+        onchange: e => LS.set(RESOLVER_LS, e.target.value.trim() || null) }),
+      el('span', { class: 'hint' }, 'Lets a pasted maps.app.goo.gl link fill in the place name by itself. Set up with resolver.gs from the repository.')),
     el('div', { class: 'dlg-actions' },
       el('button', { class: 'btn danger', style: 'margin-right:auto', onclick: () => {
         if (confirm(`Delete the trip “${t.name}” and all of its cards? This cannot be undone.`)) {

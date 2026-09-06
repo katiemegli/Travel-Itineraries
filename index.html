@@ -624,24 +624,54 @@ async function reverseAddress(lat, lng) {
     return r.results && r.results[0] ? r.results[0].formatted_address : '';
   } catch { return ''; }
 }
-/* Resolve what the person typed: a Google Maps link or a place name. Returns {title, place}. */
+/* The closest named place to a pin, for links that only carry coordinates. */
+async function nearbyPlace(lat, lng) {
+  if (!mapsReady()) return null;
+  try {
+    const { Place, SearchNearbyRankPreference } = await google.maps.importLibrary('places');
+    const { places } = await Place.searchNearby({ locationRestriction: { center: { lat, lng }, radius: 40 }, rankPreference: SearchNearbyRankPreference.DISTANCE,
+      fields: ['displayName', 'formattedAddress', 'id'], maxResultCount: 1 });
+    const p = places && places[0]; if (!p || !p.displayName) return null;
+    return { name: p.displayName, address: p.formattedAddress || '', placeId: p.id || '' };
+  } catch (e) { console.warn(e); return null; }
+}
+/* Google's Share button copies "Place name" + a short link together; pull the two apart. */
+function splitShare(text) {
+  const m = String(text || '').match(/https?:\/\/\S+/); if (!m) return null;
+  let name = (text.slice(0, m.index) + ' ' + text.slice(m.index + m[0].length)).replace(/\s+/g, ' ').trim();
+  name = name.replace(/^(check out|look at|see|view)\s+/i, '').replace(/^[!.,:;\-–—\s]+|[!.,:;\-–—\s]+$/g, '').trim();
+  return { url: m[0].replace(/[).,!]+$/, ''), name };
+}
+/* Fill in address and pin for a place that has a name (Google when available, else OpenStreetMap), keeping any link it came with. */
+async function enrichPlace(place, city) {
+  try {
+    if (mapsReady()) {
+      if (place.name) { const p = await lookupPlace(place.name, city); if (p) { place.address = place.address || p.address; place.placeId = p.placeId; if (place.lat == null) { place.lat = p.lat; place.lng = p.lng; } if (!place.url) place.url = p.url; } }
+      else if (place.lat != null) place.address = await reverseAddress(place.lat, place.lng);
+    } else if (osmOk()) {
+      if (place.name) { const p = await osmLookup(place.name, city); if (p) { place.address = place.address || p.address; if (place.lat == null) { place.lat = p.lat; place.lng = p.lng; } } }
+      else if (place.lat != null) place.address = await osmReverse(place.lat, place.lng);
+    }
+  } catch (e) { console.warn(e); }
+  return place;
+}
+/* Resolve what the person typed or pasted: a Google Maps link (with or without the shared name), or a place name. Returns {title, place}. */
 async function resolveQuery(text, city) {
   text = (text || '').trim(); if (!text) return { title: '', place: null };
-  const link = parseMapsLink(text);
+  const share = splitShare(text);
+  const link = share ? parseMapsLink(share.url) : null;
   if (link) {
+    if (!link.name && share.name) link.name = share.name;              // "Borough Market https://maps.app.goo.gl/…"
     const place = { name: link.name, address: '', lat: link.lat, lng: link.lng, url: link.url, placeId: '', source: 'link' };
-    if (link.short) return { title: '', place, needsName: true };
-    try {
-      if (mapsReady()) {
-        if (link.name) { const p = await lookupPlace(link.name, city); if (p) { place.address = p.address; place.placeId = p.placeId; if (place.lat == null) { place.lat = p.lat; place.lng = p.lng; } } }
-        else if (place.lat != null) place.address = await reverseAddress(place.lat, place.lng);
-      } else if (osmOk()) {
-        if (place.lat != null) place.address = await osmReverse(place.lat, place.lng);
-        else if (link.name) { const p = await osmLookup(link.name, city); if (p) { place.address = p.address; place.lat = p.lat; place.lng = p.lng; } }
-      }
-    } catch (e) { console.warn(e); }
-    return { title: link.name, place };
+    if (!place.name && place.lat != null) {                            // a pin with no name: ask Google what is there
+      const near = await nearbyPlace(place.lat, place.lng);
+      if (near) { place.name = near.name; place.address = near.address; place.placeId = near.placeId; }
+    }
+    if (link.short && !place.name) return { title: '', place, needsName: true };
+    await enrichPlace(place, city);
+    return { title: place.name, place };
   }
+  if (share && share.name) text = share.name;                          // some other link: keep the words, drop the link
   if (mapsReady()) {
     try { const p = await lookupPlace(text, city); if (p) return { title: text, place: p }; }
     catch (e) { console.warn(e); S.maps.error = 'Place lookup failed: ' + (e.message || e); }
@@ -976,9 +1006,18 @@ function placeField(state, city, onChange, { placeholder } = {}) {
   const run = async () => {
     const v = inp.value.trim();
     if (!v) { state.title = ''; state.place = null; state.needsName = false; redraw(); onChange(); return; }
-    const link = parseMapsLink(v);
+    const link = splitShare(v) ? parseMapsLink(splitShare(v).url) : null;
     if (!link && state.title === v && state.place && state.place.source !== 'link') return; // unchanged name, keep the found place
-    if (!link && state.place && state.place.source === 'link') { state.title = v; state.needsName = false; redraw(); onChange(); return; } // naming a pasted pin
+    if (!link && state.place && state.place.source === 'link') {                                // naming a pasted pin: keep the link, fetch the rest
+      state.title = v; state.needsName = false; state.place.name = v;
+      if (!state.place.address || state.place.lat == null) {
+        state.busy = true; redraw();
+        const p = state.promise = enrichPlace(state.place, city);
+        await p; if (state.promise !== p) return;
+        state.busy = false;
+      }
+      redraw(); onChange(); return;
+    }
     state.busy = true; redraw();
     const p = state.promise = resolveQuery(v, city);
     const r = await p; if (state.promise !== p) return;
@@ -987,8 +1026,12 @@ function placeField(state, city, onChange, { placeholder } = {}) {
     inp.value = state.title; redraw(); onChange();
   };
   inp.addEventListener('change', run);
-  inp.addEventListener('paste', () => setTimeout(run, 0));
-  inp.addEventListener('input', () => { state.title = inp.value; if (!parseMapsLink(inp.value)) onChange(); });
+  inp.addEventListener('paste', e => {
+    const clip = e.clipboardData ? e.clipboardData.getData('text') : '';
+    if (splitShare(clip)) { e.preventDefault(); inp.value = clip.replace(/\s+/g, ' ').trim(); run(); } // keep the shared name that sits on its own line
+    else setTimeout(run, 0);
+  });
+  inp.addEventListener('input', () => { state.title = inp.value; if (!splitShare(inp.value)) onChange(); });
   box.append(inp, line); box.input = inp; box.run = run;
   return box;
 }

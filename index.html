@@ -617,12 +617,23 @@ function loadMaps() {
   return S.maps.promise;
 }
 const mapsReady = () => S.maps.state === 'ready' && window.google && window.google.maps;
+/* Does a found place plausibly match what was typed? Compares letters and digits only, so "Shibuya 109" matches "SHIBUYA109". */
+const squash = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+function matchesQuery(query, foundName, foundAddress) {
+  const tokens = String(query || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 3 || /^\d{2,}$/.test(w));
+  if (!tokens.length) return false;
+  const name = squash(foundName), addr = squash(foundAddress);
+  if (name && tokens.some(w => name.includes(squash(w)))) return true;
+  return !name && tokens.every(w => addr.includes(squash(w)));
+}
 async function lookupPlace(query, city) {
   if (!mapsReady()) return null;
   const { Place } = await google.maps.importLibrary('places');
-  const { places } = await Place.searchByText({ textQuery: city && !query.toLowerCase().includes(city.toLowerCase()) ? `${query}, ${city}` : query,
-    fields: ['displayName', 'formattedAddress', 'location', 'googleMapsURI', 'id'], maxResultCount: 1 });
-  const p = places && places[0]; if (!p) return null;
+  const req = { textQuery: query, fields: ['displayName', 'formattedAddress', 'location', 'googleMapsURI', 'id'], maxResultCount: 3 };
+  const bias = await tripBias(city); if (bias) req.locationBias = { center: bias, radius: 30000 }; // nudge toward the trip, never restrict
+  const { places } = await Place.searchByText(req);
+  const p = (places || []).find(x => matchesQuery(query, x.displayName, x.formattedAddress)) || null;
+  if (!p) return null;
   return { name: p.displayName || query, address: p.formattedAddress || '', lat: p.location ? p.location.lat() : null, lng: p.location ? p.location.lng() : null,
     url: p.googleMapsURI || searchUrl(query), placeId: p.id || '', source: 'places' };
 }
@@ -748,10 +759,14 @@ const shortAddress = (display, name) => {
   return parts.slice(0, 4).join(', ');
 };
 async function osmLookup(query, city) {
-  const q = city && !query.toLowerCase().includes(city.toLowerCase()) ? `${query}, ${city}` : query;
-  const rows = await nominatim('search?format=jsonv2&limit=1&addressdetails=0&q=' + encodeURIComponent(q));
-  const r = Array.isArray(rows) && rows[0]; if (!r || r.lat == null) return null;
-  return { name: r.name || query, address: shortAddress(r.display_name, r.name), lat: +r.lat, lng: +r.lon, url: searchUrl(query), placeId: '', source: 'osm' };
+  // Try the name on its own first, then with the trip's city; accept only a result whose name matches what was typed.
+  const tries = [query]; if (city && !query.toLowerCase().includes(city.toLowerCase())) tries.push(`${query}, ${city}`);
+  for (const q of tries) {
+    const rows = await nominatim('search?format=jsonv2&limit=3&addressdetails=0&q=' + encodeURIComponent(q));
+    const r = Array.isArray(rows) && rows.find(x => x && x.lat != null && matchesQuery(query, x.name, x.display_name));
+    if (r) return { name: r.name || query, address: shortAddress(r.display_name, r.name), lat: +r.lat, lng: +r.lon, url: searchUrl(query), placeId: '', source: 'osm' };
+  }
+  return null;
 }
 async function osmReverse(lat, lng) {
   const r = await nominatim(`reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
@@ -821,7 +836,7 @@ const looksLike = (title, found) => { const a = words(title), b = new Set(words(
 async function autoLocate(ev, t) {
   if (!mapsReady() || !ev.title || ev.place || (ev.located && ev.located.v === 1)) return;
   let place = null;
-  try { const p = await lookupPlace(ev.title, ev.city || t.cities[0] || ''); if (p && looksLike(ev.title, p.name)) place = p; }
+  try { const p = await lookupPlace(ev.title, ev.city || t.cities[0] || ''); if (p && looksLike(ev.title, p.name) && matchesQuery(ev.title, p.name, p.address)) place = p; }
   catch (e) { console.warn(e); return; } // leave untried so it retries after a transient failure
   patchEvent(ev.id, { located: { v: 1, at: Date.now(), ok: !!place }, ...(place ? { place } : {}) }, { immediate: true });
 }

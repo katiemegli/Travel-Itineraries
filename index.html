@@ -223,6 +223,35 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
   .prop{grid-template-columns:120px 1fr}
   .status .txt{display:none}
 }
+
+/* ---------- segmented controls & add-card form ---------- */
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{border:1px solid var(--line);background:var(--panel-2);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:500;color:var(--muted);display:inline-flex;gap:5px;align-items:center}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg button:hover{border-color:var(--line-strong);color:var(--ink)}
+.seg button[aria-pressed="true"]:hover{color:var(--bg)}
+.place-line{display:flex;gap:6px;align-items:flex-start;font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
+.place-line .addr{flex:1;min-width:0;overflow-wrap:anywhere}
+.place-line .clr{color:var(--muted);padding:0 4px;border-radius:4px}
+.place-line .clr:hover{color:var(--danger)}
+.place-line.busy{color:var(--accent)}
+.place-line.warn{color:var(--danger)}
+.card-addr{display:flex;gap:5px;align-items:flex-start;font-size:12px;color:var(--muted);margin-top:5px}
+.card-addr a{color:inherit;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.card-addr a:hover{text-decoration:underline;color:var(--ink)}
+.card-res{margin-top:6px;font-size:13px;display:flex;gap:6px;align-items:baseline}
+.card-res .st{font-weight:600;font-size:12px;letter-spacing:.02em}
+.card-res.booked .st{color:var(--ok)}
+.card-res.open .st{color:var(--accent)}
+.card-res .det{color:var(--ink);overflow-wrap:anywhere}
+.chip.est{opacity:.85}
+.chip.est::after{content:"est.";font-size:10px;opacity:.7;margin-left:2px;font-weight:400}
+.auto-line{font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0 2px}
+.auto-line .why{color:var(--muted);font-size:12px}
+.section-h{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-top:8px}
+.kbd{font-size:12px;color:var(--muted)}
+.dlg .prop{grid-template-columns:118px 1fr}
+@media (max-width:760px){.dlg .prop{grid-template-columns:1fr;gap:4px}.dlg .prop-k{padding-top:0}}
 </style>
 </head>
 <body>
@@ -283,7 +312,7 @@ const fmtRange = days => {
   return `${fmtDate(days[0], { month: 'short', day: 'numeric' })} – ${fmtDate(days[days.length - 1])}`;
 };
 const initials = name => name.trim().split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '·';
-const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+const LS = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
 
 const ICONS = {
   chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
@@ -294,7 +323,6 @@ const ICONS = {
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5" fill="currentColor"/></svg>',
   book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z"/></svg>',
-  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/></svg>',
   person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="7" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/></svg>',
   cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
@@ -306,7 +334,7 @@ const ICONS = {
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
   archive: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v12h14V8M10 12h4"/></svg>',
 };
-const icon = name => { const s = el('span', { class: 'ic', style: 'display:inline-flex' }); s.innerHTML = ICONS[name]; return s.firstChild; };
+const icon = name => { const s = el('span'); s.innerHTML = ICONS[name]; return s.firstChild; };
 
 /* ================= constants ================= */
 const MODES = {
@@ -315,26 +343,26 @@ const MODES = {
   bus:    { label: 'bus',     icon: '🚌', h: 215 },
   tram:   { label: 'tram',    icon: '🚋', h: 215 },
   train:  { label: 'train',   icon: '🚆', h: 245 },
+  drive:  { label: 'car',     icon: '🚗', h: 38 },
   taxi:   { label: 'taxi',    icon: '🚕', h: 38 },
-  drive:  { label: 'drive',   icon: '🚗', h: 38 },
   tuktuk: { label: 'tuk-tuk', icon: '🛺', h: 38 },
   bike:   { label: 'bike',    icon: '🚲', h: 100 },
   ferry:  { label: 'ferry',   icon: '⛴️', h: 190 },
   flight: { label: 'flight',  icon: '✈️', h: 275 },
 };
 const TIME_H = 325;
+const WALK_MAX = 35, TRANSIT_MAX = 45; // minutes: walk under 35, subway under 45, otherwise car
+// List order doubles as the sort order for cards without a time.
 const DEFAULT_CATEGORIES = [
-  { id: 'food',     name: 'Food',     emoji: '🍽️', h: 18 },
-  { id: 'drinks',   name: 'Drinks',   emoji: '🍸', h: 330 },
-  { id: 'sights',   name: 'Sights',   emoji: '🏛️', h: 210 },
-  { id: 'activity', name: 'Activity', emoji: '🎟️', h: 275 },
-  { id: 'hotel',    name: 'Hotel',    emoji: '🏨', h: 150 },
-  { id: 'transit',  name: 'Transit',  emoji: '✈️', h: 195 },
-  { id: 'shopping', name: 'Shopping', emoji: '🛍️', h: 45 },
-  { id: 'rest',     name: 'Rest',     emoji: '🛋️', h: 100 },
+  { id: 'lunch',    name: 'Lunch',        emoji: '🥪', h: 40,  autoTime: '12:00', sortTime: '12:00' },
+  { id: 'cafe',     name: 'Dessert/Cafe', emoji: '🍰', h: 330, sortTime: '14:30' },
+  { id: 'activity', name: 'Activity',     emoji: '🎟️', h: 210, sortTime: '15:00' },
+  { id: 'dinner',   name: 'Dinner',       emoji: '🍽️', h: 18,  autoTime: '17:30', sortTime: '17:30' },
+  { id: 'bar',      name: 'Bar',          emoji: '🍸', h: 275, sortTime: '20:30' },
 ];
+const LEGACY_CAT = { food: ev => (!ev.time || ev.time < '15:00') ? 'lunch' : 'dinner', drinks: 'bar', sights: 'activity', hotel: 'activity', transit: 'activity', rest: 'activity', shopping: 'activity' };
 const EMOJI = '🥪 🍜 🍣 🍛 🍕 🍔 🥐 🍰 🍦 ☕ 🍵 🍷 🍸 🍺 🥂 🍹 🏛️ 🏰 🗼 🗽 ⛩️ 🕌 🎡 🎢 🎨 🖼️ 🎭 🎶 🎫 🎟️ 🌺 🌸 🌳 🌊 🏖️ ⛰️ 🏞️ 🌅 🌃 🏙️ 🛍️ 👗 👚 💄 💅 🧖 🛀 🛏️ 🏨 🏠 🛬 🛫 ✈️ 🚆 🚇 🚌 🚕 ⛴️ 🚲 🐚 🐔 🍗 🥩 🦞 🦪 🐟 🧭 📸 🗺️ 🎁 💍 ❤️ ⭐'.split(' ');
-const RESERVATION_HINTS = ['Booked', 'Need to book', 'Walk-in', 'Tickets bought', 'Waitlist', 'No reservation needed'];
+const MAPS_KEY_LS = 'bookshelf-of-memories/maps-key';
 
 /* ================= storage backends ================= */
 class LocalStore {
@@ -387,9 +415,33 @@ const S = {
   showArchived: false, catFilter: '',
   editingId: null, unsubEvents: null,
   savingCount: 0, lastError: null,
+  maps: { state: 'off', error: '', promise: null }, // off | loading | ready | failed
+  autoBusy: false, autoAgain: false,
 };
 const trip = () => S.trips[S.tripId];
 const catOf = id => (trip()?.categories || []).find(c => c.id === id);
+const catIndex = id => { const i = (trip()?.categories || []).findIndex(c => c.id === id); return i < 0 ? 99 : i; };
+
+/* ================= normalization (older saved shapes) ================= */
+function normalizeTrip(t) {
+  if (!Array.isArray(t.categories) || !t.categories.length) t.categories = clone(DEFAULT_CATEGORIES);
+  const ids = new Set(t.categories.map(c => c.id));
+  if (!['lunch', 'dinner', 'bar', 'cafe', 'activity'].some(id => ids.has(id)) && [...ids].some(id => LEGACY_CAT[id])) t.categories = clone(DEFAULT_CATEGORIES);
+  t.travelers ||= []; t.cities ||= []; t.days ||= [];
+  return t;
+}
+function normalizeEvent(ev, t) {
+  if (typeof ev.booked !== 'boolean') {
+    const r = (ev.reservation || '').trim();
+    ev.booked = /^booked/i.test(r);
+    ev.reservation = ev.booked ? r.replace(/^booked[\s,:–-]*/i, '') : r;
+  }
+  if (ev.category && t && !t.categories.some(c => c.id === ev.category) && LEGACY_CAT[ev.category]) {
+    const m = LEGACY_CAT[ev.category]; ev.category = typeof m === 'function' ? m(ev) : m;
+  }
+  ev.notes ||= {}; ev.transport ||= { mins: null, mode: '' }; ev.place ||= null; ev.auto ||= null;
+  return ev;
+}
 
 /* ================= status ================= */
 function setStatus() {
@@ -425,17 +477,17 @@ function saveTrip(t, { debounced } = {}) {
   };
   clearTimeout(S.timers['trip:' + t.id]);
   if (debounced) S.timers['trip:' + t.id] = setTimeout(write, 500); else write();
-  renderTop(); renderFilters(); renderBoard();
+  renderAll();
 }
 function selectTrip(id) {
   if (S.tripId === id) return;
   S.tripId = id; S.events = {}; S.pending = {}; closeEditor();
-  try { localStorage.setItem('bookshelf-of-memories/last-trip', id); } catch {}
+  LS.set('bookshelf-of-memories/last-trip', id);
   if (S.unsubEvents) { S.unsubEvents(); S.unsubEvents = null; }
   if (!id) { renderAll(); return; }
   S.unsubEvents = S.store.watchEvents(id, list => {
-    const next = {};
-    for (const e of list) next[e.id] = S.pending[e.id] || e;
+    const t = trip(); const next = {};
+    for (const e of list) next[e.id] = S.pending[e.id] || normalizeEvent(e, t);
     for (const pid in S.pending) if (!next[pid] && S.pending[pid]) next[pid] = S.pending[pid];
     S.events = next;
     renderAll(); refreshEditor();
@@ -447,23 +499,19 @@ function addDay(t, iso) {
   t.days = [...t.days, iso].sort();
   saveTrip(t);
 }
-function removeDay(t, iso) {
-  t.days = t.days.filter(d => d !== iso);
-  saveTrip(t);
-}
+function removeDay(t, iso) { t.days = t.days.filter(d => d !== iso); saveTrip(t); }
 
 /* ================= events ================= */
 function newEvent(date) {
   const now = Date.now();
-  return { id: uid(), title: '', emoji: '', category: '', reservation: '', archived: false, notes: {}, rating: 0,
-    date: date || '', time: '', transport: { mins: null, mode: '' }, city: '', outfit: '', order: now, createdAt: now, updatedAt: now };
+  return { id: uid(), title: '', emoji: '', category: '', booked: false, reservation: '', archived: false, notes: {}, rating: 0,
+    date: date || '', time: '', transport: { mins: null, mode: '' }, place: null, auto: null, city: '', outfit: '', order: now, createdAt: now, updatedAt: now };
 }
-function createEvent(date, open = true) {
-  const ev = newEvent(date);
+function insertEvent(ev, { open = false } = {}) {
   S.events[ev.id] = ev; S.pending[ev.id] = ev;
   flushEvent(ev.id);
-  renderBoard();
-  if (open) openEditor(ev.id, { focusTitle: true });
+  renderAll();
+  if (open) openEditor(ev.id);
   return ev;
 }
 function patchEvent(id, changes, { immediate = false } = {}) {
@@ -473,7 +521,7 @@ function patchEvent(id, changes, { immediate = false } = {}) {
   clearTimeout(S.timers[id]);
   if (immediate) flushEvent(id); else S.timers[id] = setTimeout(() => flushEvent(id), 450);
   scheduleBoard();
-  if (immediate && S.editingId === id) renderEditor();
+  if (immediate && S.editingId === id) { const ed = $('#editor'); if (!(ed.contains(document.activeElement) && document.activeElement !== ed)) renderEditor(); }
   return ev;
 }
 function flushEvent(id) {
@@ -487,27 +535,169 @@ function deleteEvent(id) {
   delete S.pending[id]; delete S.events[id];
   if (S.editingId === id) closeEditor();
   track(Promise.resolve(S.store.deleteEvent(S.tripId, id)));
-  renderBoard();
+  renderAll();
 }
 function duplicateEvent(id) {
   const src = S.events[id]; if (!src) return;
-  const ev = { ...clone(src), id: uid(), title: src.title ? src.title + ' (copy)' : '', order: src.order + 1, createdAt: Date.now(), updatedAt: Date.now() };
-  S.events[ev.id] = ev; S.pending[ev.id] = ev; flushEvent(ev.id);
-  renderBoard(); openEditor(ev.id);
+  const ev = { ...clone(src), id: uid(), title: src.title ? src.title + ' (copy)' : '', auto: null, order: src.order + 1, createdAt: Date.now(), updatedAt: Date.now() };
+  insertEvent(ev, { open: true });
 }
-const cmpEvents = (a, b) => {
+// Sort: by time; a card without a time takes its category's typical time (lunch, dessert/cafe, activity, dinner, bar).
+const virtTime = e => e.time || (catOf(e.category) || {}).sortTime || '';
+function cmpEvents(a, b) {
+  const ta = virtTime(a), tb = virtTime(b);
+  if (ta !== tb) { if (!ta) return 1; if (!tb) return -1; return ta < tb ? -1 : 1; }
   if (!!a.time !== !!b.time) return a.time ? -1 : 1;
-  if (a.time && a.time !== b.time) return a.time < b.time ? -1 : 1;
+  const ca = catIndex(a.category), cb = catIndex(b.category); if (ca !== cb) return ca - cb;
   return (a.order || 0) - (b.order || 0) || (a.createdAt || 0) - (b.createdAt || 0);
-};
-function eventsFor(date) {
+}
+function dayEvents(date, { all = false } = {}) {
   const t = trip(); const days = new Set(t.days);
   return Object.values(S.events)
     .filter(e => (date === '' ? !days.has(e.date) : e.date === date))
-    .filter(e => S.showArchived || !e.archived)
-    .filter(e => !S.catFilter || e.category === S.catFilter)
+    .filter(e => !e.archived || (!all && S.showArchived))
+    .filter(e => all || !S.catFilter || e.category === S.catFilter)
     .sort(cmpEvents);
 }
+
+/* ================= places & Google Maps ================= */
+function parseMapsLink(str) {
+  let u; try { u = new URL(str.trim()); } catch { return null; }
+  if (!/(^|\.)google\.[a-z.]+$|goo\.gl$/.test(u.hostname)) return null;
+  const out = { url: u.href, name: '', lat: null, lng: null, short: /goo\.gl$/.test(u.hostname) };
+  if (out.short) return out;
+  const m = u.pathname.match(/\/place\/([^/]+)/); if (m) out.name = decodeURIComponent(m[1].replace(/\+/g, ' '));
+  const pin = u.href.match(/!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/);
+  const at = u.pathname.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (pin) { out.lat = +pin[1]; out.lng = +pin[2]; } else if (at) { out.lat = +at[1]; out.lng = +at[2]; }
+  const q = u.searchParams.get('q') || u.searchParams.get('query') || u.searchParams.get('daddr') || u.searchParams.get('destination');
+  if (q) { const qm = q.match(/^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/); if (qm) { if (out.lat == null) { out.lat = +qm[1]; out.lng = +qm[2]; } } else if (!out.name) out.name = q; }
+  const ll = u.searchParams.get('ll'); if (ll && out.lat == null) { const [a, b] = ll.split(','); out.lat = +a; out.lng = +b; }
+  return out;
+}
+const searchUrl = q => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
+const mapsUrl = ev => (ev.place && ev.place.url) || (ev.title ? searchUrl(ev.title + (ev.city ? ', ' + ev.city : '')) : '');
+const hasCoords = ev => !!(ev.place && typeof ev.place.lat === 'number' && typeof ev.place.lng === 'number');
+
+function mapsKey() { return LS.get(MAPS_KEY_LS) || ''; }
+function loadMaps() {
+  const key = mapsKey();
+  if (!key) { S.maps.state = 'off'; return Promise.resolve(false); }
+  if (window.google && window.google.maps) { S.maps.state = 'ready'; return Promise.resolve(true); }
+  if (S.maps.promise) return S.maps.promise;
+  S.maps.state = 'loading'; S.maps.error = '';
+  S.maps.promise = new Promise(res => {
+    const done = ok => { S.maps.state = ok ? 'ready' : 'failed'; if (!ok && !S.maps.error) S.maps.error = 'Google Maps could not load here.'; S.maps.promise = null; res(ok); scheduleAuto(); };
+    window.__bomMapsReady = () => done(true);
+    window.gm_authFailure = () => { S.maps.error = 'Google rejected this API key.'; done(false); };
+    const sc = document.createElement('script');
+    sc.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&loading=async&callback=__bomMapsReady';
+    sc.async = true; sc.onerror = () => done(false);
+    document.head.append(sc);
+    setTimeout(() => { if (S.maps.state === 'loading') done(false); }, 15000);
+  });
+  return S.maps.promise;
+}
+const mapsReady = () => S.maps.state === 'ready' && window.google && window.google.maps;
+async function lookupPlace(query, city) {
+  if (!mapsReady()) return null;
+  const { Place } = await google.maps.importLibrary('places');
+  const { places } = await Place.searchByText({ textQuery: city && !query.toLowerCase().includes(city.toLowerCase()) ? `${query}, ${city}` : query,
+    fields: ['displayName', 'formattedAddress', 'location', 'googleMapsURI', 'id'], maxResultCount: 1 });
+  const p = places && places[0]; if (!p) return null;
+  return { name: p.displayName || query, address: p.formattedAddress || '', lat: p.location ? p.location.lat() : null, lng: p.location ? p.location.lng() : null,
+    url: p.googleMapsURI || searchUrl(query), placeId: p.id || '', source: 'places' };
+}
+async function reverseAddress(lat, lng) {
+  if (!mapsReady()) return '';
+  try {
+    const { Geocoder } = await google.maps.importLibrary('geocoding');
+    const r = await new Geocoder().geocode({ location: { lat, lng } });
+    return r.results && r.results[0] ? r.results[0].formatted_address : '';
+  } catch { return ''; }
+}
+/* Resolve what the person typed: a Google Maps link or a place name. Returns {title, place}. */
+async function resolveQuery(text, city) {
+  text = (text || '').trim(); if (!text) return { title: '', place: null };
+  const link = parseMapsLink(text);
+  if (link) {
+    const place = { name: link.name, address: '', lat: link.lat, lng: link.lng, url: link.url, placeId: '', source: 'link' };
+    if (link.short) return { title: '', place, needsName: true };
+    if (mapsReady()) {
+      try {
+        if (link.name) { const p = await lookupPlace(link.name, city); if (p) { place.address = p.address; place.placeId = p.placeId; if (place.lat == null) { place.lat = p.lat; place.lng = p.lng; } } }
+        else if (place.lat != null) place.address = await reverseAddress(place.lat, place.lng);
+      } catch (e) { console.warn(e); }
+    }
+    return { title: link.name, place };
+  }
+  if (mapsReady()) {
+    try { const p = await lookupPlace(text, city); if (p) return { title: text, place: p }; }
+    catch (e) { console.warn(e); S.maps.error = 'Place lookup failed: ' + (e.message || e); }
+  }
+  return { title: text, place: null };
+}
+
+/* ---- transport between consecutive cards ---- */
+const haversine = (a, b) => {
+  const R = 6371000, r = x => x * Math.PI / 180;
+  const dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+function estimatePair(a, b) {
+  const m = haversine(a.place, b.place);
+  const walk = Math.max(1, Math.round(m / 75 * 1.25));     // ~4.5 km/h on real streets
+  if (walk < WALK_MAX) return { mode: 'walk', mins: walk, est: true };
+  return { mode: 'drive', mins: Math.round(m / 1000 / 22 * 60 + 5), est: true }; // ~22 km/h city driving plus pickup
+}
+const durCache = new Map();
+async function duration(a, b, mode) {
+  const k = `${a.place.lat},${a.place.lng}>${b.place.lat},${b.place.lng}:${mode}`;
+  if (durCache.has(k)) return durCache.get(k);
+  const { DirectionsService } = await google.maps.importLibrary('routes');
+  let mins = null;
+  try {
+    const r = await new DirectionsService().route({ origin: { lat: a.place.lat, lng: a.place.lng }, destination: { lat: b.place.lat, lng: b.place.lng }, travelMode: google.maps.TravelMode[mode] });
+    const leg = r.routes && r.routes[0] && r.routes[0].legs[0]; if (leg) mins = Math.round(leg.duration.value / 60);
+  } catch (e) { if (!/ZERO_RESULTS/.test(String(e))) { console.warn(e); S.maps.error = 'Directions failed: ' + (e.message || e); } }
+  durCache.set(k, mins); return mins;
+}
+async function googlePair(a, b) {
+  const walk = await duration(a, b, 'WALKING');
+  if (walk != null && walk < WALK_MAX) return { mode: 'walk', mins: walk };
+  const transit = await duration(a, b, 'TRANSIT');
+  if (transit != null && transit < TRANSIT_MAX) return { mode: 'subway', mins: transit };
+  const drive = await duration(a, b, 'DRIVING');
+  if (drive != null) return { mode: 'drive', mins: drive };
+  if (transit != null) return { mode: 'subway', mins: transit };
+  if (walk != null) return { mode: 'walk', mins: walk };
+  return null;
+}
+const pairKey = (a, b) => hasCoords(a) && hasCoords(b) ? `${a.place.lat.toFixed(5)},${a.place.lng.toFixed(5)}>${b.place.lat.toFixed(5)},${b.place.lng.toFixed(5)}` : '';
+let autoTimer = 0;
+function scheduleAuto() { clearTimeout(autoTimer); autoTimer = setTimeout(updateAutoTransport, 600); }
+async function updateAutoTransport() {
+  if (S.autoBusy) { S.autoAgain = true; return; }
+  S.autoBusy = true;
+  try {
+    const t = trip(); if (!t) return;
+    for (const date of [...t.days, '']) {
+      const evs = dayEvents(date, { all: true });
+      for (let i = 0; i < evs.length; i++) {
+        const b = evs[i], a = evs[i - 1];
+        const key = a ? pairKey(a, b) : '';
+        if (!key) { if (b.auto) patchEvent(b.id, { auto: null }, { immediate: true }); continue; }
+        if (b.auto && b.auto.key === key && !(b.auto.est && mapsReady())) continue;
+        let r = null;
+        if (mapsReady()) { try { r = await googlePair(a, b); } catch (e) { console.warn(e); } }
+        if (!r) r = estimatePair(a, b);
+        patchEvent(b.id, { auto: { key, ...r, at: Date.now() } }, { immediate: true });
+      }
+    }
+  } finally { S.autoBusy = false; if (S.autoAgain) { S.autoAgain = false; scheduleAuto(); } }
+}
+const effectiveTransport = ev => (ev.transport && (ev.transport.mins || ev.transport.mode)) ? { ...ev.transport, manual: true } : (ev.auto && ev.auto.mode ? ev.auto : null);
 
 /* ================= render: top ================= */
 function renderAll() { renderTop(); renderFilters(); renderBoard(); }
@@ -524,6 +714,7 @@ function renderTop() {
       el('button', { class: 'trip-btn', onclick: e => tripMenu(e.currentTarget), 'aria-label': 'Switch trip' }, el('span', { class: 'trip-name' }, name), icon('chev')),
       el('div', { class: 'trip-sub' }, sub)),
     el('div', { class: 'top-actions' }, status,
+      t && el('button', { class: 'iconbtn', title: 'Add a card', 'aria-label': 'Add a card', onclick: () => addCardDialog(t.days[0] || '') }, icon('plus')),
       t && el('button', { class: 'iconbtn', title: 'Trip settings', 'aria-label': 'Trip settings', onclick: () => settingsDialog() }, icon('gear'))));
   setStatus();
 }
@@ -539,7 +730,7 @@ function renderFilters() {
     f.append(chip(`${c.emoji} ${c.name}`, S.catFilter === c.id, () => { S.catFilter = S.catFilter === c.id ? '' : c.id; renderFilters(); renderBoard(); }, n));
   }
   const na = all.filter(e => e.archived).length;
-  if (na) f.append(chip(`Archived`, S.showArchived, () => { S.showArchived = !S.showArchived; renderFilters(); renderBoard(); }, na));
+  if (na) f.append(chip('Archived', S.showArchived, () => { S.showArchived = !S.showArchived; renderFilters(); renderBoard(); }, na));
 }
 
 /* ================= render: board ================= */
@@ -566,9 +757,10 @@ function renderBoard() {
     el('div', { class: 'col-body' }, el('button', { class: 'addday-btn', onclick: () => addDay(t, t.days.length ? addDays(t.days[t.days.length - 1], 1) : today()) }, icon('plus'), t.days.length ? 'Add a day' : 'Add first day'))));
   board.scrollLeft = scrollLeft;
   board.querySelectorAll('.col-body').forEach(b => { if (scrolls[b.dataset.date]) b.scrollTop = scrolls[b.dataset.date]; });
+  scheduleAuto();
 }
 function renderColumn(t, date) {
-  const evs = eventsFor(date);
+  const evs = dayEvents(date);
   const isUn = date === '';
   const col = el('div', { class: 'col' + (isUn ? ' unsched' : ''), dataset: { date } });
   const head = el('div', { class: 'col-head' },
@@ -579,37 +771,34 @@ function renderColumn(t, date) {
       el('span', { class: 'cnt' }, evs.length ? `${evs.length}` : ''),
       !isUn && el('button', { class: 'menu', 'aria-label': 'Day options', onclick: e => dayMenu(e.currentTarget, t, date) }, icon('dots'))));
   const body = el('div', { class: 'col-body', dataset: { date } });
-  evs.forEach((ev, i) => {
-    body.append(renderLink(ev, i === 0));
-    body.append(renderCard(ev));
-  });
+  evs.forEach((ev, i) => { body.append(renderLink(ev, i === 0)); body.append(renderCard(ev)); });
   if (!evs.length && isUn) body.append(el('div', { class: 'empty-col' }, 'Drag a card here to park it, or add one below.'));
-  body.append(el('button', { class: 'newcard', onclick: () => createEvent(date) }, icon('plus'), 'New'));
+  body.append(el('button', { class: 'newcard', onclick: () => addCardDialog(date) }, icon('plus'), 'New'));
   col.append(head, body);
   return col;
 }
+/* The row between two cards: how long it takes to get from the card above to this one. */
 function renderLink(ev, first) {
-  const tr = ev.transport || {};
-  const has = tr.mins || tr.mode;
-  if (!has && first) return el('div', { class: 'gap' });
-  const link = el('div', { class: 'link' + (has ? '' : ' empty') }, el('div', { class: 'line' }));
-  if (has) link.append(transportChip(tr, { onclick: e => { e.stopPropagation(); openEditor(ev.id, { focus: 'transport' }); }, role: 'button', title: 'Edit how you get here' }));
-  else link.append(el('button', { class: 'addtr', onclick: () => openEditor(ev.id, { focus: 'transport' }) }, '+ how do you get here?'));
+  const tr = effectiveTransport(ev);
+  if (!tr && first) return el('div', { class: 'gap' });
+  const link = el('div', { class: 'link' + (tr ? '' : ' empty') }, el('div', { class: 'line' }));
+  if (tr) link.append(transportChip(tr, { onclick: e => { e.stopPropagation(); openEditor(ev.id, { focus: 'transport' }); }, role: 'button', tabindex: '0',
+    title: tr.manual ? 'Entered by hand' : (tr.est ? 'Estimated from the two map pins. Add a Google Maps key in trip settings for real directions.' : 'From Google Maps directions') }));
+  else link.append(el('button', { class: 'addtr', onclick: () => openEditor(ev.id, { focus: 'transport' }) }, hasCoords(ev) ? '+ add a location to the card above for directions' : '+ add a location for directions'));
   return link;
 }
 function transportChip(tr, attrs = {}) {
   const m = MODES[tr.mode];
   const parts = [];
-  if (tr.mins) parts.push(`${tr.mins} min`);
+  if (tr.mins) parts.push(`${tr.est ? '~' : ''}${tr.mins} min`);
   if (m) parts.push(m.label);
-  const h = m ? m.h : 0;
-  return el('span', { class: 'chip' + (m ? ' tone' : ''), style: m ? `--h:${h}` : '', ...attrs }, m && el('span', { 'aria-hidden': 'true' }, m.icon), parts.join(' '));
+  return el('span', { class: 'chip' + (m ? ' tone' : '') + (tr.est ? ' est' : ''), style: m ? `--h:${m.h}` : '', ...attrs }, m && el('span', { 'aria-hidden': 'true' }, m.icon), parts.join(' '));
 }
 function renderCard(ev) {
   const t = trip();
   const cat = catOf(ev.category);
   const card = el('div', { class: 'card' + (ev.archived ? ' archived' : ''), dataset: { id: ev.id }, tabindex: '0', role: 'button',
-    onclick: e => { if (card._dragged) return; openEditor(ev.id); },
+    onclick: () => { if (card._dragged) return; openEditor(ev.id); },
     onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditor(ev.id); } } });
   if (cat) card.append(el('div', { class: 'card-cat', style: `--h:${cat.h}` }, el('i'), cat.name));
   const grip = el('span', { class: 'grip', title: 'Drag to another day', 'aria-hidden': 'true' }, icon('grip'));
@@ -617,7 +806,9 @@ function renderCard(ev) {
     el('span', { class: 'card-emoji' + (ev.emoji ? '' : ' none') }, ev.emoji || (cat ? cat.emoji : '▫️')),
     el('div', { class: 'title' + (ev.title ? '' : ' untitled') }, ev.title || 'Untitled'),
     grip));
-  if (ev.reservation) card.append(el('div', { class: 'card-res' }, ev.reservation));
+  const url = mapsUrl(ev);
+  if (ev.place && (ev.place.address || ev.place.url)) card.append(el('div', { class: 'card-addr' }, '📍', el('a', { href: url, target: '_blank', rel: 'noopener', onclick: e => e.stopPropagation(), title: 'Open in Google Maps' }, ev.place.address || (hasCoords(ev) ? 'Pinned · open in Google Maps' : 'Open in Google Maps'))));
+  if (ev.booked || ev.reservation) card.append(el('div', { class: 'card-res ' + (ev.booked ? 'booked' : 'open') }, el('span', { class: 'st' }, ev.booked ? 'Booked' : 'Not booked'), ev.reservation && el('span', { class: 'det' }, ev.reservation)));
   const meta = el('div', { class: 'card-meta' });
   if (ev.time) meta.append(el('span', { class: 'chip tone', style: `--h:${TIME_H}` }, fmtTime(ev.time)));
   if (ev.rating) meta.append(el('span', { class: 'stars', title: `${ev.rating} of 5` }, '★'.repeat(ev.rating) + '☆'.repeat(5 - ev.rating)));
@@ -641,6 +832,7 @@ function renderCard(ev) {
 function attachDrag(card, grip, ev) {
   card.addEventListener('pointerdown', e => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.target.closest('a')) return;
     const onGrip = grip.contains(e.target);
     if (e.pointerType !== 'mouse' && !onGrip) return; // touch: scroll unless on the grip
     e.preventDefault();
@@ -674,10 +866,10 @@ function attachDrag(card, grip, ev) {
         const date = over.dataset.date;
         const changes = {};
         if (date !== ev.date) changes.date = date;
-        if (!ev.time) { // untimed cards keep a manual order
-          const cards = [...over.querySelectorAll('.card:not(.dragging)')].map(c => S.events[c.dataset.id]).filter(x => x && !x.time);
-          const rects = [...over.querySelectorAll('.card:not(.dragging)')].filter(c => S.events[c.dataset.id] && !S.events[c.dataset.id].time).map(c => c.getBoundingClientRect());
-          let idx = rects.findIndex(r => m.clientY < r.top + r.height / 2); if (idx < 0) idx = cards.length;
+        if (!ev.time) {
+          const nodes = [...over.querySelectorAll('.card:not(.dragging)')].filter(c => S.events[c.dataset.id] && !S.events[c.dataset.id].time);
+          const cards = nodes.map(c => S.events[c.dataset.id]);
+          let idx = nodes.map(c => c.getBoundingClientRect()).findIndex(r => m.clientY < r.top + r.height / 2); if (idx < 0) idx = cards.length;
           const before = cards[idx - 1], after = cards[idx];
           changes.order = before && after ? (before.order + after.order) / 2 : before ? before.order + 1000 : after ? after.order - 1000 : Date.now();
         }
@@ -688,6 +880,102 @@ function attachDrag(card, grip, ev) {
   });
 }
 
+/* ================= shared form pieces ================= */
+function segmented(options, value, onPick) {
+  const wrap = el('div', { class: 'seg', role: 'group' });
+  const paint = v => wrap.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+  for (const o of options) wrap.append(el('button', { type: 'button', dataset: { v: o.value }, 'aria-pressed': String(o.value === value), onclick: () => { paint(o.value); onPick(o.value); } }, o.label));
+  wrap.set = paint;
+  return wrap;
+}
+function autosize(ta) { ta.style.height = 'auto'; ta.style.height = Math.max(38, ta.scrollHeight + 2) + 'px'; }
+function placeLine(place, { busy, needsName, onClear } = {}) {
+  const line = el('div', { class: 'place-line' + (busy ? ' busy' : '') + (needsName ? ' warn' : '') });
+  if (busy) { line.append('Looking up…'); return line; }
+  if (!place) { line.append(S.maps.state === 'ready' ? 'Address will be filled in from Google Maps' : 'Paste a Google Maps link to save the pin'); return line; }
+  line.append('📍', el('span', { class: 'addr' }, needsName ? 'Short link saved. Type the place name above.' : (place.address || (place.lat != null ? 'Pin saved from the link' : 'Link saved'))));
+  if (onClear) line.append(el('button', { type: 'button', class: 'clr', title: 'Forget this location', 'aria-label': 'Forget this location', onclick: onClear }, '✕'));
+  return line;
+}
+/* Name-or-link field with the lookup wired in. state: {title, place, busy, needsName, promise} */
+function placeField(state, city, onChange, { placeholder } = {}) {
+  const box = el('div');
+  const inp = el('input', { value: state.title, placeholder: placeholder || 'Place name or Google Maps link', autocomplete: 'off', spellcheck: 'false' });
+  let line = placeLine(state.place, state);
+  const redraw = () => { const nl = placeLine(state.place, { ...state, onClear: state.place ? () => { state.place = null; state.needsName = false; redraw(); onChange(); } : null }); line.replaceWith(nl); line = nl; };
+  const run = async () => {
+    const v = inp.value.trim();
+    if (!v) { state.title = ''; state.place = null; state.needsName = false; redraw(); onChange(); return; }
+    const link = parseMapsLink(v);
+    if (!link && state.title === v && state.place && state.place.source !== 'link') return; // unchanged name, keep the found place
+    if (!link && state.place && state.place.source === 'link') { state.title = v; state.needsName = false; redraw(); onChange(); return; } // naming a pasted pin
+    state.busy = true; redraw();
+    const p = state.promise = resolveQuery(v, city);
+    const r = await p; if (state.promise !== p) return;
+    state.busy = false; state.needsName = !!r.needsName;
+    state.title = r.title || (r.needsName ? '' : v); state.place = r.place;
+    inp.value = state.title; redraw(); onChange();
+  };
+  inp.addEventListener('change', run);
+  inp.addEventListener('paste', () => setTimeout(run, 0));
+  inp.addEventListener('input', () => { state.title = inp.value; if (!parseMapsLink(inp.value)) onChange(); });
+  box.append(inp, line); box.input = inp; box.run = run;
+  return box;
+}
+function reservationField(state, onChange) {
+  const box = el('div');
+  const details = el('input', { value: state.reservation || '', placeholder: 'Reservation details, e.g. book on Resy 2 weeks ahead', style: 'margin-top:8px', oninput: e => { state.reservation = e.target.value; onChange('text'); } });
+  const paintDetails = () => { details.placeholder = state.booked ? 'Booking details, e.g. 7:30 for 2, under Katie' : 'Reservation details, e.g. book on Resy 2 weeks ahead'; };
+  const seg = segmented([{ value: 'yes', label: '✓ Booked' }, { value: 'no', label: 'Not booked' }], state.booked ? 'yes' : 'no', v => { state.booked = v === 'yes'; paintDetails(); onChange('toggle'); });
+  paintDetails();
+  box.append(seg, details);
+  return box;
+}
+
+/* ================= add-card dialog ================= */
+function addCardDialog(date) {
+  const t = trip(); if (!t) return;
+  const st = { title: '', place: null, busy: false, needsName: false, promise: null, category: '', date: date || '', time: '', timeTouched: false, notes: {}, booked: false, reservation: '' };
+  const travelers = t.travelers.length ? t.travelers : ['Notes'];
+  const prop = (ic, label, ...ctrl) => el('div', { class: 'prop' }, el('div', { class: 'prop-k' }, icon(ic), el('span', {}, label)), el('div', { class: 'prop-v' }, ...ctrl));
+  const submit = el('button', { class: 'btn primary', type: 'button' }, 'Add card');
+  const refreshSubmit = () => { submit.disabled = !st.title.trim() && !st.place; };
+  const pf = placeField(st, t.cities[0] || '', refreshSubmit);
+  const time = el('input', { type: 'time', value: st.time, onchange: e => { st.time = e.target.value; st.timeTouched = true; } });
+  const catSeg = segmented(t.categories.map(c => ({ value: c.id, label: `${c.emoji} ${c.name}` })), '', v => {
+    st.category = v; const c = catOf(v);
+    if (c && c.autoTime && !st.timeTouched) { st.time = c.autoTime; time.value = c.autoTime; }
+  });
+  const dateInp = el('input', { type: 'date', value: st.date, onchange: e => { st.date = e.target.value; } });
+  const noteRows = travelers.map(who => {
+    const ta = el('textarea', { rows: 1, placeholder: who === 'Notes' ? 'Notes' : `What ${who} wants to remember`, oninput: e => { st.notes[who] = e.target.value; autosize(e.target); } });
+    return prop('person', who === 'Notes' ? 'Notes' : `${who}'s notes`, ta);
+  });
+  const res = reservationField(st, () => {});
+  submit.addEventListener('click', async () => {
+    submit.disabled = true; submit.textContent = 'Adding…';
+    await pf.run(); if (st.promise) { try { await st.promise; } catch {} }
+    if (!st.title.trim() && !st.place) { submit.disabled = false; submit.textContent = 'Add card'; pf.input.focus(); return; }
+    const ev = { ...newEvent(st.date), title: st.title.trim() || (st.place && st.place.name) || 'Untitled', place: st.place, category: st.category, time: st.time,
+      notes: Object.fromEntries(Object.entries(st.notes).filter(([, v]) => v && v.trim())), booked: st.booked, reservation: st.reservation.trim(), city: (st.place && st.place.address && t.cities.find(c => st.place.address.includes(c))) || '' };
+    if (st.date && !t.days.includes(st.date)) addDay(t, st.date);
+    d.close(); insertEvent(ev);
+  });
+  refreshSubmit();
+  const d = dialog([
+    el('h2', {}, 'Add a card'),
+    el('p', {}, 'Type a place name or paste a Google Maps link. Everything else is optional.'),
+    prop('pin', 'Place', pf),
+    prop('tag', 'Category', catSeg),
+    prop('cal', 'Date', dateInp),
+    prop('clock', 'Time', time, el('div', { class: 'ed-hint' }, 'Lunch fills in 12:00 PM and dinner 5:30 PM. Change it any time.')),
+    ...noteRows,
+    prop('book', 'Reservation', res),
+    el('div', { class: 'dlg-actions' }, el('button', { class: 'btn', type: 'button', onclick: () => d.close() }, 'Cancel'), submit),
+  ]);
+  setTimeout(() => pf.input.focus(), 30);
+}
+
 /* ================= editor ================= */
 let editorRendered = '';
 function openEditor(id, opts = {}) {
@@ -695,8 +983,7 @@ function openEditor(id, opts = {}) {
   $('#editor').classList.add('open'); $('#backdrop').classList.add('open');
   renderEditor();
   const ed = $('#editor');
-  if (opts.focusTitle) setTimeout(() => $('.ed-title', ed)?.focus(), 30);
-  if (opts.focus === 'transport') setTimeout(() => { const f = $('#f-mins', ed); f?.scrollIntoView({ block: 'center' }); f?.focus(); }, 30);
+  if (opts.focus === 'transport') setTimeout(() => { const f = $('#f-transport', ed); f && f.scrollIntoView({ block: 'center' }); }, 30);
 }
 function closeEditor() {
   S.editingId = null; editorRendered = '';
@@ -712,32 +999,37 @@ function refreshEditor() {
   if (ed.contains(document.activeElement) && document.activeElement !== ed) return; // don't clobber typing
   renderEditor();
 }
-function autosize(ta) { ta.style.height = 'auto'; ta.style.height = Math.max(38, ta.scrollHeight + 2) + 'px'; }
 function renderEditor() {
   const ed = $('#editor'); const ev = S.events[S.editingId]; const t = trip();
   if (!ev || !t) { closeEditor(); return; }
   editorRendered = JSON.stringify(ev);
-  const scrollTop = $('.ed-scroll', ed)?.scrollTop || 0;
+  const scrollTop = $('.ed-scroll', ed) ? $('.ed-scroll', ed).scrollTop : 0;
   ed.replaceChildren();
   const cat = catOf(ev.category);
   const prop = (ic, label, ...ctrl) => el('div', { class: 'prop' }, el('div', { class: 'prop-k' }, icon(ic), el('span', {}, label)), el('div', { class: 'prop-v' }, ...ctrl));
-  const text = (key, ph, multi) => {
-    const n = el(multi ? 'textarea' : 'input', { value: ev[key] || '', placeholder: ph, rows: multi ? 1 : null,
-      oninput: e => { patchEvent(ev.id, { [key]: e.target.value }); if (multi) autosize(e.target); },
-      onblur: () => flushEvent(ev.id) });
-    if (multi) requestAnimationFrame(() => autosize(n));
-    return n;
-  };
 
   const emojiBtn = el('button', { class: 'emoji-btn' + (ev.emoji ? ' has' : ''), title: 'Choose an icon', 'aria-label': 'Choose an icon', onclick: e => emojiPicker(e.currentTarget, ev.id) }, ev.emoji || (cat ? cat.emoji : '▫️'));
   const title = el('input', { class: 'ed-title', value: ev.title, placeholder: 'Untitled', oninput: e => patchEvent(ev.id, { title: e.target.value }), onblur: () => flushEvent(ev.id),
     onkeydown: e => { if (e.key === 'Enter') e.target.blur(); } });
 
-  const catSel = el('select', { onchange: e => patchEvent(ev.id, { category: e.target.value }, { immediate: true }) },
-    el('option', { value: '' }, 'None'), t.categories.map(c => el('option', { value: c.id, selected: c.id === ev.category }, `${c.emoji} ${c.name}`)));
+  // Place: paste a link or a name; the lookup fills the address and pin.
+  const pst = { title: ev.place && ev.place.name ? ev.place.name : '', place: ev.place, busy: false, needsName: false, promise: null };
+  const pf = placeField(pst, ev.city || t.cities[0] || '', () => {
+    if (pst.busy) return;
+    const changes = { place: pst.place ? { ...pst.place, name: pst.place.name || pst.title } : null };
+    if (!ev.title && pst.title) changes.title = pst.title;
+    patchEvent(ev.id, changes, { immediate: true });
+  }, { placeholder: 'Google Maps link or place name' });
+  const openLink = mapsUrl(ev) ? el('a', { class: 'ed-hint', href: mapsUrl(ev), target: '_blank', rel: 'noopener', style: 'display:inline-block;margin-top:6px;color:var(--accent)' }, 'Open in Google Maps ↗') : null;
 
-  const resv = el('input', { value: ev.reservation, placeholder: 'Booked, need to book, walk-in…', list: 'resv-list', oninput: e => patchEvent(ev.id, { reservation: e.target.value }), onblur: () => flushEvent(ev.id) });
-  const resvList = el('datalist', { id: 'resv-list' }, RESERVATION_HINTS.map(h => el('option', { value: h })));
+  const catSeg = segmented(t.categories.map(c => ({ value: c.id, label: `${c.emoji} ${c.name}` })), ev.category, v => {
+    const changes = { category: ev.category === v ? '' : v }; const c = catOf(changes.category);
+    if (c && c.autoTime && !S.events[ev.id].time) changes.time = c.autoTime;
+    patchEvent(ev.id, changes, { immediate: true });
+  });
+
+  const rst = { booked: ev.booked, reservation: ev.reservation };
+  const resv = reservationField(rst, kind => { if (kind === 'toggle') patchEvent(ev.id, { booked: rst.booked }, { immediate: true }); else patchEvent(ev.id, { reservation: rst.reservation }); });
 
   const archive = el('label', { class: 'switch' }, el('input', { type: 'checkbox', checked: !!ev.archived, onchange: e => patchEvent(ev.id, { archived: e.target.checked }, { immediate: true }) }), el('span', { style: 'color:var(--muted);font-size:13px' }, ev.archived ? 'Hidden from the board' : 'Showing on the board'));
 
@@ -756,15 +1048,24 @@ function renderEditor() {
   const date = el('input', { type: 'date', value: ev.date, onchange: e => { const v = e.target.value; patchEvent(ev.id, { date: v }, { immediate: true }); if (v && !t.days.includes(v)) addDay(t, v); } });
   const time = el('input', { type: 'time', value: ev.time, onchange: e => patchEvent(ev.id, { time: e.target.value }, { immediate: true }) });
 
+  // Transportation: automatic from directions, with a manual override.
   const tr = ev.transport || { mins: null, mode: '' };
-  const mins = el('input', { id: 'f-mins', type: 'number', min: 0, step: 1, inputmode: 'numeric', placeholder: 'min', value: tr.mins ?? '',
+  const manual = !!(tr.mins || tr.mode);
+  const autoLine = el('div', { class: 'auto-line', id: 'f-transport' });
+  if (ev.auto && ev.auto.mode) autoLine.append(transportChip(ev.auto), el('span', { class: 'why' }, ev.auto.est ? 'estimated from the two map pins' : 'Google Maps directions'), manual && el('span', { class: 'why' }, '· overridden below'));
+  else if (!hasCoords(ev)) autoLine.append(el('span', { class: 'why' }, 'Add a Google Maps link to this card and the one before it to get the travel time here.'));
+  else autoLine.append(el('span', { class: 'why' }, 'Waiting for a located card before this one.'));
+  const mins = el('input', { type: 'number', min: 0, step: 1, inputmode: 'numeric', placeholder: 'min', value: tr.mins ?? '',
     oninput: e => patchEvent(ev.id, { transport: { ...S.events[ev.id].transport, mins: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value, 10) || 0) } }), onblur: () => flushEvent(ev.id) });
   const mode = el('select', { onchange: e => patchEvent(ev.id, { transport: { ...S.events[ev.id].transport, mode: e.target.value } }, { immediate: true }) },
     el('option', { value: '' }, 'How?'), Object.entries(MODES).map(([k, m]) => el('option', { value: k, selected: k === tr.mode }, `${m.icon} ${m.label}`)));
+  const clearManual = manual ? el('button', { class: 'btn', style: 'margin-top:8px', onclick: () => patchEvent(ev.id, { transport: { mins: null, mode: '' } }, { immediate: true }) }, 'Use directions instead') : null;
 
   const cities = [...new Set([...(t.cities || []), ...Object.values(S.events).map(e => e.city).filter(Boolean)])];
   const city = el('input', { value: ev.city, placeholder: 'City', list: 'city-list', oninput: e => patchEvent(ev.id, { city: e.target.value }), onblur: () => flushEvent(ev.id) });
   const cityList = el('datalist', { id: 'city-list' }, cities.map(c => el('option', { value: c })));
+  const outfit = el('textarea', { rows: 1, value: ev.outfit || '', placeholder: 'What to wear', oninput: e => { patchEvent(ev.id, { outfit: e.target.value }); autosize(e.target); }, onblur: () => flushEvent(ev.id) });
+  requestAnimationFrame(() => autosize(outfit));
 
   const dayName = ev.date && t.days.includes(ev.date) ? `${weekday(ev.date)}, ${fmtDate(ev.date)}` : (ev.date ? 'Not one of this trip\'s days' : 'Unscheduled');
 
@@ -774,16 +1075,17 @@ function renderEditor() {
       el('button', { class: 'iconbtn', 'aria-label': 'Close', onclick: closeEditor }, icon('x'))),
     el('div', { class: 'ed-scroll' },
       el('div', { class: 'ed-hero' }, emojiBtn, title),
-      prop('tag', 'Category', catSel),
-      prop('book', 'Reservation', resv, resvList),
-      prop('archive', 'Archive', archive),
-      ...noteRows,
-      prop('star', 'Rating', rating),
+      prop('pin', 'Place', pf, openLink),
+      prop('tag', 'Category', catSeg),
       prop('cal', 'Date', date),
       prop('clock', 'Time', time),
-      prop('route', 'Transportation', el('div', { class: 'row' }, mins, mode), el('div', { class: 'ed-hint' }, 'How you get here from the previous card')),
+      ...noteRows,
+      prop('book', 'Reservation', resv),
+      prop('route', 'Transportation', autoLine, el('div', { class: 'section-h' }, 'Override by hand'), el('div', { class: 'row', style: 'margin-top:6px' }, mins, mode), clearManual),
+      prop('star', 'Rating', rating),
+      prop('archive', 'Archive', archive),
       prop('pin', 'City', city, cityList),
-      prop('shirt', 'Outfit', text('outfit', 'What to wear', true)),
+      prop('shirt', 'Outfit', outfit),
       el('div', { class: 'ed-foot' },
         el('button', { class: 'btn', onclick: () => duplicateEvent(ev.id) }, icon('copy'), 'Duplicate'),
         el('button', { class: 'btn danger', style: 'margin-left:auto', onclick: () => { if (confirm(`Delete “${ev.title || 'Untitled'}”?`)) deleteEvent(ev.id); } }, icon('trash'), 'Delete'))));
@@ -835,7 +1137,7 @@ function dayMenu(anchor, t, date) {
   const n = Object.values(S.events).filter(e => e.date === date).length;
   menu(anchor, [
     { label: `${weekday(date)}, ${fmtDate(date)}` },
-    { label: 'Add a card', onclick: () => createEvent(date) },
+    { label: 'Add a card', onclick: () => addCardDialog(date) },
     { label: 'Add a day before', onclick: () => addDay(t, addDays(date, -1)) },
     { label: 'Add a day after', onclick: () => addDay(t, addDays(date, 1)) },
     'hr',
@@ -847,9 +1149,10 @@ function dayMenu(anchor, t, date) {
 function dialog(content) {
   const d = $('#dlg'); d.replaceChildren(el('div', { class: 'dlg' }, ...content)); d.showModal(); return d;
 }
+const splitList = s => s.split(',').map(x => x.trim()).filter(Boolean);
 function newTripDialog() {
   const prev = trip();
-  const name = el('input', { placeholder: 'e.g. London, Tokyo & Bangkok', autofocus: true });
+  const name = el('input', { placeholder: 'e.g. London, Tokyo & Bangkok' });
   const start = el('input', { type: 'date', value: today() });
   const days = el('input', { type: 'number', min: 1, max: 60, value: 4 });
   const trav = el('input', { value: prev ? prev.travelers.join(', ') : 'Ryan, Katie', placeholder: 'Ryan, Katie' });
@@ -859,7 +1162,7 @@ function newTripDialog() {
     el('div', { class: 'field' }, el('label', {}, 'Trip name'), name),
     el('div', { class: 'fields-2' }, el('div', { class: 'field' }, el('label', {}, 'First day'), start), el('div', { class: 'field' }, el('label', {}, 'Number of days'), days)),
     el('div', { class: 'field' }, el('label', {}, 'Travelers'), trav, el('span', { class: 'hint' }, 'Each traveler gets their own notes on every card.')),
-    el('div', { class: 'field' }, el('label', {}, 'Cities'), cities, el('span', { class: 'hint' }, 'Comma-separated. You can add more later.')),
+    el('div', { class: 'field' }, el('label', {}, 'Cities'), cities, el('span', { class: 'hint' }, 'Comma-separated. The first city narrows place lookups.')),
     el('div', { class: 'dlg-actions' },
       el('button', { class: 'btn', onclick: () => d.close() }, 'Cancel'),
       el('button', { class: 'btn primary', onclick: () => {
@@ -870,7 +1173,6 @@ function newTripDialog() {
   ]);
   setTimeout(() => name.focus(), 30);
 }
-const splitList = s => s.split(',').map(x => x.trim()).filter(Boolean);
 function settingsDialog() {
   const t = trip(); if (!t) return;
   const save = () => saveTrip(t, { debounced: true });
@@ -886,14 +1188,28 @@ function settingsDialog() {
       el('button', { class: 'del', 'aria-label': `Remove ${c.name}`, onclick: () => { t.categories = t.categories.filter(x => x !== c); save(); renderCats(); } }, icon('x')))));
   };
   renderCats();
-  const addCat = el('button', { class: 'btn', onclick: () => { t.categories.push({ id: uid(), name: 'New category', emoji: '✨', h: Math.floor(Math.random() * 360) }); save(); renderCats(); list.lastChild.children[1].focus(); list.lastChild.children[1].select(); } }, icon('plus'), 'Add category');
+  const addCat = el('button', { class: 'btn', onclick: () => { t.categories.push({ id: uid(), name: 'New category', emoji: '✨', h: Math.floor(Math.random() * 360), sortTime: '' }); save(); renderCats(); list.lastChild.children[1].focus(); list.lastChild.children[1].select(); } }, icon('plus'), 'Add category');
+
+  // Google Maps key lives on this device only, never in the shared trip.
+  const mapsStatus = el('span', { class: 'hint' });
+  const paintMaps = () => {
+    const k = mapsKey();
+    mapsStatus.textContent = !k ? 'No key: links still save the pin, and travel times are estimated from pins.'
+      : S.maps.state === 'ready' ? 'Connected. Names look up addresses and travel times come from Google directions.'
+      : S.maps.state === 'loading' ? 'Connecting…'
+      : (S.maps.error || 'Google Maps could not load here.') + ' Travel times fall back to estimates.';
+  };
+  paintMaps();
+  const keyInp = el('input', { type: 'password', value: mapsKey(), placeholder: 'AIza…', autocomplete: 'off', onchange: e => { LS.set(MAPS_KEY_LS, e.target.value.trim() || null); S.maps.state = 'off'; S.maps.error = ''; paintMaps(); loadMaps().then(paintMaps); } });
   const d = dialog([
     el('h2', {}, 'Trip settings'),
     el('div', { class: 'field' }, el('label', {}, 'Trip name'), name),
     el('div', { class: 'field' }, el('label', {}, 'Subtitle'), sub),
     el('div', { class: 'field' }, el('label', {}, 'Travelers'), trav, el('span', { class: 'hint' }, 'Comma-separated. Each traveler gets a notes field on every card.')),
-    el('div', { class: 'field' }, el('label', {}, 'Cities'), cities, el('span', { class: 'hint' }, 'Suggested in the City field on each card.')),
-    el('div', { class: 'field' }, el('label', {}, 'Categories'), list, el('div', {}, addCat)),
+    el('div', { class: 'field' }, el('label', {}, 'Cities'), cities, el('span', { class: 'hint' }, 'The first city narrows place lookups.')),
+    el('div', { class: 'field' }, el('label', {}, 'Categories'), el('span', { class: 'hint' }, 'Top to bottom is also the order for cards that have no time.'), list, el('div', {}, addCat)),
+    el('div', { class: 'field' }, el('label', {}, 'Google Maps API key (this device only)'), keyInp, mapsStatus,
+      el('span', { class: 'hint' }, 'Enable the Maps JavaScript, Places (New), Directions and Geocoding APIs for the key, and restrict it to this site.')),
     el('div', { class: 'dlg-actions' },
       el('button', { class: 'btn danger', style: 'margin-right:auto', onclick: () => {
         if (confirm(`Delete the trip “${t.name}” and all of its cards? This cannot be undone.`)) {
@@ -909,29 +1225,29 @@ function settingsDialog() {
 /* ================= sample trip (first run on this device) ================= */
 function sampleTrip() {
   const t = newTrip({ name: 'London', start: '2026-08-22', nDays: 4, travelers: ['Ryan', 'Katie'], cities: ['London'] });
-  t.subtitle = '';
   let o = 0;
   const E = (date, time, title, emoji, category, extra = {}) => ({ ...newEvent(date), time, title, emoji, category, order: ++o, ...extra, transport: { mins: null, mode: '', ...(extra.transport || {}) } });
   const evs = [
-    E('2026-08-22', '10:20', 'Arrive in London', '🛬', 'transit', { city: 'London' }),
-    E('2026-08-22', '11:30', 'Hotel: Great Scotland Yard Hotel', '🏠', 'hotel', { notes: { Katie: 'Check-in is at 3pm' }, city: 'London' }),
-    E('2026-08-22', '12:00', 'Lunch? Kiln? Malatang?', '', 'food'),
-    E('2026-08-22', '14:00', 'Big Ben', '🏰', 'sights', { transport: { mins: 11, mode: 'walk' } }),
-    E('2026-08-22', '17:30', 'Dishoom - Covent Garden', '🍛', 'food', { reservation: 'Booked', transport: { mins: 12, mode: 'subway' } }),
-    E('2026-08-23', '12:00', 'Sch…', '🐔', 'food', { reservation: 'Booked', transport: { mins: 38, mode: 'subway' } }),
-    E('2026-08-23', '17:30', 'Gymkhana', '🍗', 'food', { reservation: 'Booked', transport: { mins: 22, mode: 'walk' } }),
-    E('2026-08-24', '12:00', 'Borough Market', '🥪', 'food', { notes: { Katie: 'Dorset Oysters Bar, The Ginger Pig, The Black Pig, Bread Ahead' }, transport: { mins: 18, mode: 'subway' } }),
-    E('2026-08-24', '14:00', 'Glass flower workshop', '🌺', 'activity', { reservation: 'Booked, 2.5 hrs', transport: { mins: 30, mode: 'walk' } }),
-    E('2026-08-24', '17:00', 'Relax at Hotel & Get Ready', '👚', 'rest', { transport: { mins: 30, mode: 'walk' } }),
-    E('2026-08-24', '18:30', 'Osteria Angelina', '🐚', 'food', { reservation: 'Booked', transport: { mins: 25, mode: 'subway' } }),
-    E('2026-08-25', '12:00', 'Darwin Brasserie · Sky Garden', '🏙️', 'food', { reservation: 'Booked', notes: { Katie: 'Sky Garden restaurant' } }),
-    E('2026-08-25', '18:00', 'Mo…', '🥩', 'food', { reservation: 'Booked', transport: { mins: 20, mode: 'walk' } }),
-    E('2026-08-25', '20:00', 'Scarfes Bar', '🍸', 'drinks', { reservation: 'Booked', transport: { mins: 4, mode: 'walk' } }),
-    E('2026-08-25', '', 'Or…', '🍷', 'drinks', { transport: { mins: 11, mode: 'walk' } }),
+    E('2026-08-22', '10:20', 'Arrive in London', '🛬', 'activity', { city: 'London' }),
+    E('2026-08-22', '11:30', 'Hotel: Great Scotland Yard Hotel', '🏠', 'activity', { notes: { Katie: 'Check-in is at 3pm' }, city: 'London' }),
+    E('2026-08-22', '12:00', 'Lunch? Kiln? Malatang?', '', 'lunch'),
+    E('2026-08-22', '14:00', 'Big Ben', '🏰', 'activity', { transport: { mins: 11, mode: 'walk' } }),
+    E('2026-08-22', '17:30', 'Dishoom - Covent Garden', '🍛', 'dinner', { booked: true, transport: { mins: 12, mode: 'subway' } }),
+    E('2026-08-23', '12:00', 'Sch…', '🐔', 'lunch', { booked: true, transport: { mins: 38, mode: 'subway' } }),
+    E('2026-08-23', '17:30', 'Gymkhana', '🍗', 'dinner', { booked: true, transport: { mins: 22, mode: 'walk' } }),
+    E('2026-08-24', '12:00', 'Borough Market', '🥪', 'lunch', { notes: { Katie: 'Dorset Oysters Bar, The Ginger Pig, The Black Pig, Bread Ahead' }, transport: { mins: 18, mode: 'subway' } }),
+    E('2026-08-24', '14:00', 'Glass flower workshop', '🌺', 'activity', { booked: true, reservation: '2.5 hrs', transport: { mins: 30, mode: 'walk' } }),
+    E('2026-08-24', '17:00', 'Relax at Hotel & Get Ready', '👚', 'activity', { transport: { mins: 30, mode: 'walk' } }),
+    E('2026-08-24', '18:30', 'Osteria Angelina', '🐚', 'dinner', { booked: true, transport: { mins: 25, mode: 'subway' } }),
+    E('2026-08-25', '12:00', 'Darwin Brasserie · Sky Garden', '🏙️', 'lunch', { booked: true, notes: { Katie: 'Sky Garden restaurant' } }),
+    E('2026-08-25', '18:00', 'Mo…', '🥩', 'dinner', { booked: true, transport: { mins: 20, mode: 'walk' } }),
+    E('2026-08-25', '20:00', 'Scarfes Bar', '🍸', 'bar', { booked: true, transport: { mins: 4, mode: 'walk' } }),
+    E('2026-08-25', '', 'Or…', '🍷', 'bar', { transport: { mins: 11, mode: 'walk' } }),
   ];
   return { trip: t, events: evs };
 }
 window.__sampleTrip = sampleTrip;
+window.__parseMapsLink = parseMapsLink;
 
 /* ================= boot ================= */
 async function boot() {
@@ -940,6 +1256,7 @@ async function boot() {
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (openPop) closePop(); else if (S.editingId && !$('#dlg').open) closeEditor(); } });
   window.addEventListener('beforeunload', () => { for (const id in S.pending) flushEvent(id); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) for (const id in S.pending) flushEvent(id); });
+  loadMaps();
 
   let db = null;
   try { if (window.claude && typeof window.claude.use === 'function') db = await window.claude.use('db'); } catch (e) { console.warn(e); }
@@ -949,7 +1266,7 @@ async function boot() {
   let first = true;
   S.store.watchTrips(list => {
     const next = {};
-    for (const t of list) next[t.id] = S.pendingTrip[t.id] || t;
+    for (const t of list) next[t.id] = S.pendingTrip[t.id] || normalizeTrip(t);
     for (const id in S.pendingTrip) if (!next[id]) next[id] = S.pendingTrip[id];
     S.trips = next;
     if (first) {
@@ -958,13 +1275,14 @@ async function boot() {
         const { trip: t, events } = sampleTrip();
         S.trips[t.id] = t; track(S.store.saveTrip(t)); for (const e of events) track(S.store.saveEvent(t.id, e));
       }
-      let last = null; try { last = localStorage.getItem('bookshelf-of-memories/last-trip'); } catch {}
+      const last = LS.get('bookshelf-of-memories/last-trip');
       const pick = S.trips[last] ? last : (Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt)[0] || {}).id || null;
       selectTrip(pick);
     } else if (S.tripId && !S.trips[S.tripId]) {
       const nxt = Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt)[0];
       selectTrip(nxt ? nxt.id : null);
     }
+    for (const id in S.events) normalizeEvent(S.events[id], trip());
     renderAll();
   }, e => { S.lastError = 'Could not open the shared trip'; S.ready = true; renderAll(); });
 }

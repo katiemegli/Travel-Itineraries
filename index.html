@@ -723,7 +723,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.28'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.29'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -1666,7 +1666,7 @@ function renderTop() {
   const sub = t ? (t.subtitle || [`${t.days.length} day${t.days.length === 1 ? '' : 's'}`, `${count} stop${count === 1 ? '' : 's'}`].join(' · ')) : 'Plan each day as a board of cards';
   top.append(
     el('div', { class: 'top-row' },
-      el('button', { class: 'trip-btn', onclick: e => tripMenu(e.currentTarget), 'aria-label': 'Switch trip' }, el('span', { class: 'ring' }, icon('backline')), 'Trips'),
+      el('button', { class: 'trip-btn', onclick: e => tripMenu(e.currentTarget), 'aria-label': 'Switch trip' }, 'Trips'),
       el('div', { class: 'top-actions' }, status,
         t && el('button', { class: 'iconbtn', title: 'Add a card', 'aria-label': 'Add a card', onclick: () => addCardDialog(t.days[0] || '') }, icon('plus')),
         t && el('button', { class: 'iconbtn', title: 'Trip settings', 'aria-label': 'Trip settings', onclick: () => settingsDialog() }, icon('gear')))),

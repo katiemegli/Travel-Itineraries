@@ -91,8 +91,7 @@ body[data-theme="mono"] .newcard,body[data-theme="mono"] .addday-btn,body[data-t
 
 /* ---------- undertone: black rules and type over a moving gradient ---------- */
 #glbg{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;display:none}
-#glbg-scrim{position:fixed;inset:0;z-index:0;pointer-events:none;display:none;background:rgba(255,255,255,.42)}
-body[data-theme="undertone"] #glbg,body[data-theme="undertone"] #glbg-scrim{display:block}
+body[data-theme="undertone"] #glbg{display:block}
 body[data-theme="undertone"] #app{position:relative;z-index:1}
 body[data-theme="undertone"]{
   --paper:#FFFFFF; --ink:#000000; --sand:rgba(0,0,0,.08); --sky:#1d3557; --cream:#FFFFFF; --lemon:#e9c46a; --olive:#2a9d8f; --terra:#e85d04;
@@ -133,6 +132,15 @@ body[data-theme="undertone"] .unsched-section{border-top:1px solid #000}
 body[data-theme="undertone"] .newcard,body[data-theme="undertone"] .addday-btn,body[data-theme="undertone"] .btn{border:1px solid #000}
 body[data-theme="undertone"] .link .addtr,body[data-theme="undertone"] .link .chip{background:transparent}
 body[data-theme="undertone"] .col:last-child{border-right:none}
+/* Below the tabs the board rides on the design's half-opaque panel, blurred and lifted
+   off the gradient, so the small type stays legible without flattening the colour. */
+body[data-theme="undertone"] .main,body[data-theme="undertone"] .unsched-section{
+  background:rgba(255,255,255,.15);
+  backdrop-filter:blur(40px) saturate(150%);
+  -webkit-backdrop-filter:blur(40px) saturate(150%);
+}
+body[data-theme="undertone"] .main{border-top:1px solid #000}
+body[data-theme="undertone"] .unsched-section{margin:0;padding-left:var(--sp-xl);padding-right:var(--sp-xl)}
 body[data-theme="undertone"] body,body[data-theme="undertone"]{background:#111}
 
 /* ---------- hero (top area) ---------- */
@@ -659,7 +667,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.8'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.9'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -1098,13 +1106,13 @@ let undertone = null, undertoneMouse = { x: 0, y: 0 };
 document.addEventListener('mousemove', e => { undertoneMouse = { x: e.clientX, y: window.innerHeight - e.clientY }; });
 function undertoneBg(on) {
   if (!on) {
-    if (undertone) { cancelAnimationFrame(undertone.raf); undertone.canvas.remove(); undertone.scrim.remove(); undertone = null; }
+    if (undertone) { cancelAnimationFrame(undertone.raf); undertone.canvas.remove(); undertone = null; }
     return;
   }
   if (undertone) return;
-  const canvas = el('canvas', { id: 'glbg' }), scrim = el('div', { id: 'glbg-scrim' });
-  document.body.append(canvas, scrim);
-  undertone = { canvas, scrim, raf: 0 };
+  const canvas = el('canvas', { id: 'glbg' });
+  document.body.append(canvas);
+  undertone = { canvas, raf: 0 };
   const gl = canvas.getContext('webgl');
   // Without WebGL the same colours are laid down as a plain gradient.
   if (!gl) { canvas.style.background = 'linear-gradient(135deg,#e85d04 0%,#e9c46a 35%,#a8dadc 65%,#1d3557 100%)'; return; }

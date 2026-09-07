@@ -559,13 +559,24 @@ function applyStays(t) {
 const LONDON_DAYS = ['2026-08-22', '2026-08-23', '2026-08-24', '2026-08-25'];
 const SAMPLE_TITLES = new Set(['Arrive in London', 'Hotel: Great Scotland Yard Hotel', 'Lunch? Kiln? Malatang?', 'Big Ben', 'Dishoom - Covent Garden', 'Sch…', 'Gymkhana', 'Borough Market', 'Glass flower workshop', 'Relax at Hotel & Get Ready', 'Osteria Angelina', 'Darwin Brasserie · Sky Garden', 'Mo…', 'Scarfes Bar', 'Or…']);
 const migrated = new Set();
+function fixStayOrder() {
+  const t = trip(); if (!t || t.staysFixed) return;
+  const st = t.stays || [];
+  const wrong = st.length === 2 && st[0].city === 'Bangkok' && st[0].from === '2026-12-02' && st[0].to === '2026-12-08' && st[1].city === 'Tokyo' && st[1].from === '2026-12-08' && st[1].to === '2026-12-13';
+  if (!wrong) return;
+  t.stays = [{ city: 'Tokyo', from: '2026-12-02', to: '2026-12-08' }, { city: 'Bangkok', from: '2026-12-08', to: '2026-12-13' }];
+  t.cities = []; applyStays(t);
+  if (t.name === 'Bangkok & Tokyo') t.name = 'Tokyo & Bangkok';
+  t.staysFixed = true;
+  saveTrip(t);
+}
 function migrateLondonTrip() {
   const t = trip(); if (!t || migrated.has(t.id)) return;
   if (t.name !== 'London' || (t.stays && t.stays.length) || JSON.stringify(t.days) !== JSON.stringify(LONDON_DAYS)) return;
   migrated.add(t.id);
   const oldDays = t.days.slice();
-  t.name = 'Bangkok & Tokyo';
-  t.stays = [{ city: 'Bangkok', from: '2026-12-02', to: '2026-12-08' }, { city: 'Tokyo', from: '2026-12-08', to: '2026-12-13' }];
+  t.name = 'Tokyo & Bangkok';
+  t.stays = [{ city: 'Tokyo', from: '2026-12-02', to: '2026-12-08' }, { city: 'Bangkok', from: '2026-12-08', to: '2026-12-13' }];
   t.days = []; applyStays(t);
   for (const ev of Object.values(S.events)) {
     if (SAMPLE_TITLES.has(ev.title) && !ev.place) { if (!ev.archived) patchEvent(ev.id, { archived: true }, { immediate: true }); continue; } // the London examples go to the archive
@@ -636,7 +647,7 @@ function selectTrip(id) {
     for (const e of list) next[e.id] = S.pending[e.id] || normalizeEvent(e, t);
     for (const pid in S.pending) if (!next[pid] && S.pending[pid]) next[pid] = S.pending[pid];
     S.events = next;
-    migrateLondonTrip();
+    migrateLondonTrip(); fixStayOrder();
     renderAll(); refreshEditor();
   }, e => { S.lastError = 'Lost connection to shared trip'; setStatus(); });
   renderAll();
@@ -1708,8 +1719,8 @@ function settingsDialog() {
 
 /* ================= sample trip (first run on this device) ================= */
 function sampleTrip() {
-  const t = newTrip({ name: 'Bangkok & Tokyo', start: '2026-12-02', nDays: 0, travelers: ['Ryan', 'Katie'], cities: [] });
-  t.stays = [{ city: 'Bangkok', from: '2026-12-02', to: '2026-12-08' }, { city: 'Tokyo', from: '2026-12-08', to: '2026-12-13' }];
+  const t = newTrip({ name: 'Tokyo & Bangkok', start: '2026-12-02', nDays: 0, travelers: ['Ryan', 'Katie'], cities: [] });
+  t.stays = [{ city: 'Tokyo', from: '2026-12-02', to: '2026-12-08' }, { city: 'Bangkok', from: '2026-12-08', to: '2026-12-13' }];
   applyStays(t);
   return { trip: t, events: [] };
 }

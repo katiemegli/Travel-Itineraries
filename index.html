@@ -307,7 +307,7 @@ body[data-theme="undertone"] body,body[data-theme="undertone"]{background:#111}
 .backdrop.open{display:block}
 .ed-top{display:flex;align-items:center;justify-content:space-between;padding:var(--sp-lg) var(--sp-lg) 0 var(--sp-xl);flex:none}
 .ed-top .day{font:400 10px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-50)}
-.ed-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:var(--sp-sm) var(--sp-xl) var(--sp-xl);scrollbar-width:none}
+.ed-scroll{flex:1;min-height:0;max-height:calc(100dvh - 102px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:var(--sp-sm) var(--sp-xl) var(--sp-xl);scrollbar-width:none}
 .ed-scroll::-webkit-scrollbar{display:none}
 .ed-hero{display:flex;gap:var(--sp-md);align-items:center;margin:var(--sp-md) 0 var(--sp-lg);padding-bottom:var(--sp-md);border-bottom:1px solid var(--ink-20)}
 .emoji-btn{width:48px;height:48px;border:1px solid var(--ink-20);font-size:24px;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex:none;background:rgba(255,255,255,.4);font-family:system-ui}
@@ -521,7 +521,7 @@ dialog::backdrop{background:rgba(27,43,94,.4)}
   .ugrid{grid-template-columns:1fr}
   .empty-col{padding-left:0}
   .editor{width:calc(100vw - 16px);max-height:calc(100dvh - 24px)}
-  .ed-scroll{padding:var(--sp-xs) var(--sp-lg) calc(var(--sp-lg) + env(safe-area-inset-bottom))}
+  .ed-scroll{max-height:calc(100dvh - 86px);padding:var(--sp-xs) var(--sp-lg) calc(var(--sp-lg) + env(safe-area-inset-bottom))}
   .prop,.dlg .prop{grid-template-columns:1fr;gap:6px}
   .prop-k{height:auto;padding:0 0 2px}
   .dlg{padding:var(--sp-lg)}
@@ -716,7 +716,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.22'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.23'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

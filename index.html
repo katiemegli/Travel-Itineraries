@@ -72,7 +72,7 @@ a{color:inherit}
 .trip-btn .ring{display:inline-flex;align-items:center;justify-content:center}
 .trip-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5}
 .top-actions{display:flex;align-items:center;gap:var(--sp-md);flex:none}
-.status{display:flex;align-items:center;gap:8px;color:var(--ink-50);font:400 9px/1 var(--sans);letter-spacing:.3em;text-transform:uppercase;white-space:nowrap}
+.status{cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--ink-50);font:400 9px/1 var(--sans);letter-spacing:.3em;text-transform:uppercase;white-space:nowrap}
 .status .dot{width:5px;height:5px;border-radius:50%;background:var(--ink-30)}
 .status.ok .dot{background:var(--ink)}
 .status.busy .dot{background:var(--terra);animation:pulse 1s infinite}
@@ -574,6 +574,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
+const BUILD = '2026-09-07.5'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -676,7 +677,7 @@ const S = {
   showArchived: false, catFilter: '',
   editingId: null, unsubEvents: null,
   savingCount: 0, lastError: null,
-  offline: false, sharedRetry: 0, unsubTrips: null, onTrips: null, onTripsError: null,
+  offline: false, sharedRetry: 0, unsubTrips: null, onTrips: null, onTripsError: null, updateReady: '',
   maps: { state: 'off', error: '', promise: null }, // off | loading | ready | failed
   osm: { state: 'unknown' }, // unknown | ok | blocked  (the hosted artifact blocks outside requests)
   autoBusy: false, autoAgain: false,
@@ -827,6 +828,7 @@ function setStatus() {
   const s = $('#status'); if (!s) return;
   s.className = 'status';
   const where = S.backend === 'shared' ? 'shared with everyone who has the link' : (S.offline ? 'saved on this device only for now (the shared store did not answer; this page keeps trying and will send everything up as soon as it does)' : 'saved on this device');
+  if (S.updateReady) { s.classList.add('ok'); s.querySelector('.txt').textContent = 'Tap to update'; s.title = 'A newer board has been published. Tap to load it.'; return; }
   if (S.lastError) { s.classList.add('err'); s.querySelector('.txt').textContent = S.lastError; s.title = S.lastError; return; }
   if (S.maps.error) { s.classList.add('err'); s.querySelector('.txt').textContent = 'Maps: ' + S.maps.error; s.title = S.maps.error + ' Check the key in trip settings.'; return; }
   if (S.savingCount > 0) { s.classList.add('busy'); s.querySelector('.txt').textContent = 'Saving…'; }
@@ -1290,7 +1292,10 @@ function renderAll() { renderTop(); renderFilters(); renderBoard(); }
 function renderTop() {
   const top = $('#top'); top.replaceChildren();
   const t = trip();
-  const status = el('span', { class: 'status', id: 'status' }, el('i', { class: 'dot' }), el('span', { class: 'txt' }, ''));
+  const status = el('span', { class: 'status', id: 'status', role: 'button', tabindex: '0',
+    onclick: () => S.updateReady ? location.reload() : settingsDialog(),
+    onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); S.updateReady ? location.reload() : settingsDialog(); } } },
+    el('i', { class: 'dot' }), el('span', { class: 'txt' }, ''));
   if (!S.ready) { top.append(el('div'), el('div', { class: 'top-actions' }, status)); return; }
   const name = t ? t.name : 'Bookshelf of Memories';
   const count = t ? Object.values(S.events).filter(e => !e.archived).length : 0;
@@ -2022,6 +2027,20 @@ function settingsDialog() {
   renderCats();
   const addCat = el('button', { class: 'btn', onclick: () => { t.categories.push({ id: uid(), name: 'New category', emoji: '✨', h: Math.floor(Math.random() * 360), sortTime: '' }); save(); renderCats(); list.lastChild.children[1].focus(); list.lastChild.children[1].select(); } }, icon('plus'), 'Add category');
 
+  // Where this device is saving, so two devices that disagree can be compared.
+  const sharingBox = el('div');
+  const renderSharing = () => {
+    const q = (S.store && S.store.queue) ? S.store.queue.length : 0;
+    const kids = [el('span', { class: 'hint' }, S.backend === 'shared'
+      ? 'Saving to the shared board. Everyone who opens this link sees the same cards, and changes made elsewhere arrive within about ten seconds.'
+      : 'Saving to this device only. The shared board has not answered, so nothing here has reached anyone else yet. The page keeps trying.')];
+    if (S.store && S.store.hint) kids.push(el('span', { class: 'hint' }, S.store.hint));
+    if (q) kids.push(el('span', { class: 'hint' }, `${q} change${q === 1 ? '' : 's'} still to go up.`),
+      el('div', {}, el('button', { class: 'btn', onclick: async e => { e.target.disabled = true; await S.store.flushQueue(); renderSharing(); setStatus(); } }, 'Send them now')));
+    kids.push(el('span', { class: 'hint' }, `${Object.keys(S.events).length} cards here · board version ${BUILD}`));
+    sharingBox.replaceChildren(...kids);
+  };
+  renderSharing();
   // Google Maps key lives on this device only, never in the shared trip.
   const mapsStatus = el('span', { class: 'hint' },
     S.maps.state === 'ready' ? 'Google Maps is connected. Names look up addresses, the place field suggests matches as you type, and travel times come from Google directions.'
@@ -2037,6 +2056,7 @@ function settingsDialog() {
     el('div', { class: 'field' }, el('label', {}, 'Cities'), cities, el('span', { class: 'hint' }, 'Filled in from the stays. Add extra cities here if you like.')),
     el('div', { class: 'field' }, el('label', {}, 'Hotels'), el('span', { class: 'hint' }, 'Where each day starts, from the first morning to the last. Hotels never appear on the board; they only give the first stop of the day its travel row. If two overlap, the later one wins.'), hotels, el('div', {}, addHotel)),
     el('div', { class: 'field' }, el('label', {}, 'Categories'), el('span', { class: 'hint' }, 'Top to bottom is also the order for cards that have no time.'), list, el('div', {}, addCat)),
+    el('div', { class: 'field' }, el('label', {}, 'Sharing'), sharingBox),
     el('div', { class: 'field' }, el('label', {}, 'Google Maps'), mapsStatus,
       el('span', { class: 'hint' }, 'Directions between two located cards are searched automatically whenever a card is added, moved, or given a place. The Google key and the short-link helper are built into the board.')),
     el('div', { class: 'dlg-actions' },
@@ -2063,6 +2083,18 @@ window.__sampleTrip = sampleTrip;
 window.__confetti = confetti;
 window.__parseMapsLink = parseMapsLink;
 
+/* A browser can sit on a cached copy of this page for a long time, which looks exactly like
+   changes not syncing. Check now and then whether a newer board has been published. */
+async function checkForUpdate() {
+  if (S.updateReady || !/^https?:/.test(location.protocol)) return;
+  try {
+    const r = await fetch(location.pathname + '?v=' + Date.now(), { cache: 'reload' });
+    if (!r.ok) return;
+    const m = (await r.text()).match(/const BUILD = '([^']+)'/);
+    if (m && m[1] !== BUILD) { S.updateReady = m[1]; setStatus(); }
+  } catch (e) { /* offline: nothing to do */ }
+}
+
 /* ================= boot ================= */
 const HERO_LS = 'bookshelf-of-memories/hero-collapsed';
 function collapseHero() { document.body.classList.add('hero-collapsed'); LS.set(HERO_LS, '1'); }
@@ -2086,6 +2118,9 @@ async function boot() {
   window.addEventListener('beforeunload', () => { for (const id in S.pending) flushEvent(id); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) for (const id in S.pending) flushEvent(id); });
   loadMaps();
+  checkForUpdate();
+  setInterval(checkForUpdate, 300000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
 
   let db = null;
   try { if (window.claude && typeof window.claude.use === 'function') db = await window.claude.use('db'); } catch (e) { console.warn(e); }

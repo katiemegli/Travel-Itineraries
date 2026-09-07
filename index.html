@@ -94,9 +94,8 @@ body[data-theme="mono"] .card{border-radius:6px}
 body[data-theme="mono"] .newcard,body[data-theme="mono"] .addday-btn,body[data-theme="mono"] .btn{border-radius:6px;font-weight:500}
 
 /* ---------- undertone: black rules and type over a moving gradient ---------- */
-#glbg{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;display:none}
+#glbg{position:fixed;inset:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;display:none}
 body[data-theme="undertone"] #glbg{display:block}
-body[data-theme="undertone"] #app{position:relative;z-index:1}
 body[data-theme="undertone"]{
   --paper:#FFFFFF; --ink:#000000; --sand:rgba(0,0,0,.08); --sky:#1d3557; --cream:#FFFFFF; --lemon:#e9c46a; --olive:#2a9d8f; --terra:#e85d04;
   --ink-80:rgba(0,0,0,.8); --ink-70:rgba(0,0,0,.7); --ink-60:rgba(0,0,0,.62); --ink-50:rgba(0,0,0,.55); --ink-40:rgba(0,0,0,.45); --ink-30:rgba(0,0,0,.35); --ink-20:rgba(0,0,0,.25); --ink-10:rgba(0,0,0,.14); --ink-05:rgba(0,0,0,.07);
@@ -716,7 +715,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.23'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.24'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

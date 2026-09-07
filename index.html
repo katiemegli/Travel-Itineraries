@@ -6,7 +6,8 @@
 <meta name="color-scheme" content="light dark">
 <title>Bookshelf of Memories</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="icon" href="favicon.png" sizes="32x32" type="image/png">
+<link rel="icon" href="favicon.png" sizes="32x32" type="image/png" media="(prefers-color-scheme: light)">
+<link rel="icon" href="favicon-dark.png" sizes="32x32" type="image/png" media="(prefers-color-scheme: dark)">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -676,7 +677,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.15'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.16'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -1769,7 +1770,7 @@ function renderColumn(t, date) {
     el('div', {}, el('div', { class: 'dow' }, isUn ? 'Unscheduled' : weekday(date))),
     el('div', { class: 'right' },
       el('span', { class: 'date' }, isUn ? '' : fmtDate(date, { month: 'short', day: 'numeric' }) + (cityLine ? ' / ' + cityLine : '')),
-      !isUn && el('button', { class: 'menu', 'aria-label': 'Day options', onclick: e => dayMenu(e.currentTarget, t, date) }, icon('dots'))));
+      !isUn && el('button', { class: 'menu', 'aria-label': 'Day options', title: 'Add to this day', onclick: e => dayMenu(e.currentTarget, t, date) }, icon('plus'))));
   const body = el('div', { class: 'col-body', dataset: { date } });
   evs.forEach((ev, i) => { body.append(renderLink(ev, i === 0, evs[i - 1] || hotelOrigin(t, date))); body.append(renderCard(ev)); });
   if (!evs.length && isUn) body.append(el('div', { class: 'empty-col' }, 'Drag a card here to park it, or add one below.'));

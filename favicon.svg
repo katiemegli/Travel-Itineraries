@@ -1,5 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Bookshelf of Memories">
-  <rect width="32" height="32" rx="6" fill="#EBE6DC"/>
-  <path d="M16 27.6C12.5 25.2 3.2 18.6 3.2 11.9 3.2 8 6.3 5 10.1 5c2.6 0 4.9 1.5 5.9 3.8C17.1 6.5 19.3 5 21.9 5c3.8 0 6.9 3 6.9 6.9 0 6.7-9.3 13.3-12.8 15.7z"
-        fill="none" stroke="#1B2B5E" stroke-width="2.6" stroke-linejoin="miter" stroke-miterlimit="6"/>
+  <style>
+    /* No ground of its own: the heart is drawn in ink, and in paper where the browser is dark. */
+    .heart { fill: none; stroke: #1B2B5E; stroke-width: 2.8; stroke-linejoin: miter; stroke-miterlimit: 6 }
+    @media (prefers-color-scheme: dark) { .heart { stroke: #EBE6DC } }
+  </style>
+  <path class="heart" d="M16 27.6C12.5 25.2 3.2 18.6 3.2 11.9 3.2 8 6.3 5 10.1 5c2.6 0 4.9 1.5 5.9 3.8C17.1 6.5 19.3 5 21.9 5c3.8 0 6.9 3 6.9 6.9 0 6.7-9.3 13.3-12.8 15.7z"/>
 </svg>

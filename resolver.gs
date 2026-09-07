@@ -18,6 +18,11 @@
  *
  * Test in a browser:  <your URL>?url=https://maps.app.goo.gl/XXXX
  * You should get {"url":"https://www.google.com/maps/place/…"}.
+ *
+ * Pictures: a card's pictures are kept in a Drive folder called "Bookshelf of Memories"
+ * in the account that runs this script, shared to anyone with the link so every board can
+ * show them. The card itself holds only the file's id. The first time this version runs,
+ * Google will ask you to allow the script to use Drive; that is expected.
  */
 /*
  * Shared board storage. Everyone with the board's link reads and writes the same
@@ -47,6 +52,8 @@ function doGet(e) {
 function doPost(e) {
   var body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return reply_({ ok: false, error: 'bad json' }); }
+  if (body.op === 'putImage') return reply_(putImage_(body));
+  if (body.op === 'deleteImage') return reply_(deleteImage_(body));
   var props = PropertiesService.getScriptProperties();
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -65,6 +72,26 @@ function doPost(e) {
     props.setProperty('v', String(v));
     return reply_({ ok: true, v: v });
   } finally { lock.releaseLock(); }
+}
+/* ---- pictures, kept in Drive ---- */
+var IMAGE_FOLDER = 'Bookshelf of Memories';
+function folder_() {
+  var it = DriveApp.getFoldersByName(IMAGE_FOLDER);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(IMAGE_FOLDER);
+}
+function putImage_(w) {
+  var m = /^data:([^;]+);base64,(.*)$/.exec(String(w.data || ''));
+  if (!m) return { ok: false, error: 'not a picture' };
+  if (m[1].indexOf('image/') !== 0) return { ok: false, error: 'not a picture' };
+  var name = String(w.name || 'photo').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 120) || 'photo';
+  var blob = Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], name);
+  var file = folder_().createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return { ok: true, fileId: file.getId() };
+}
+function deleteImage_(w) {
+  try { if (w.fileId) DriveApp.getFileById(String(w.fileId)).setTrashed(true); } catch (err) {}
+  return { ok: true };
 }
 function readAll_() {
   var all = PropertiesService.getScriptProperties().getProperties();

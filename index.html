@@ -723,7 +723,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.26'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.27'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -791,6 +791,18 @@ class ScriptStore {
   watchTrips(cb) { this.tripCb = cb; cb(Object.values(this.data.trips)); return () => { this.tripCb = null; }; }
   watchEvents(tripId, cb) { this.evCb = cb; this.evTrip = tripId; cb(Object.values(this.data.events[tripId] || {})); return () => { this.evCb = null; }; }
   keep(fn) { if (this.mirror) Promise.resolve(fn()).catch(e => console.warn('device copy', e)); }
+  /* Pictures go to Drive by way of the helper and come back as a file id. This is not queued
+     like other writes: the picture is large and the answer is needed before the card can keep it. */
+  async putImage(im) {
+    const r = await fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ op: 'putImage', name: im.name, data: im.data }), redirect: 'follow' });
+    const text = await r.text(); let j = null;
+    try { j = JSON.parse(text); } catch { throw new Error(this.readHint(text)); }
+    if (!j.ok || !j.fileId) throw new Error(j.error || 'The helper did not keep the picture.');
+    return j.fileId;
+  }
+  deleteImage(fileId) {
+    return fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ op: 'deleteImage', fileId }), redirect: 'follow' }).catch(e => console.warn(e));
+  }
   saveTrip(t) { this.data.trips[t.id] = t; this.keep(() => this.mirror.saveTrip(t)); return this.send({ op: 'set', kind: 'trip', id: t.id, data: t }); }
   deleteTrip(id) { delete this.data.trips[id]; delete this.data.events[id]; this.keep(() => this.mirror.deleteTrip(id)); return this.send({ op: 'deleteTrip', id }); }
   saveEvent(tripId, ev) { (this.data.events[tripId] ||= {})[ev.id] = ev; this.keep(() => this.mirror.saveEvent(tripId, ev)); return this.send({ op: 'set', kind: 'event', tripId, id: ev.id, data: ev }); }
@@ -2145,19 +2157,26 @@ function closeEditor() {
   releasePage();
 }
 /* ================= a card's pictures ================= */
-/* The shared helper keeps each document in an Apps Script property, which holds only a few
-   kilobytes, so pictures cannot ride along inside a card there. While that store is in use they
-   are kept on the device instead; on every other store they travel with the card. */
+/* On the shared store a picture goes to Drive through the helper and the card keeps only the
+   file's id, which is small enough for the helper's few kilobytes per card. On the device store
+   and the artifact the picture rides inside the card. If the helper does not answer, the picture
+   stays on this device and the panel says so. */
 const IMG_LS = 'bookshelf-of-memories/images';
 const MAX_IMG_SIDE = 1400, IMG_QUALITY = 0.72, MAX_IMAGES = 24;
-const imagesTravel = () => S.backend !== 'shared';
+const driveUrl = (fileId, w) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${w}`;
+const imgSrc = im => im.fileId ? driveUrl(im.fileId, 800) : im.data;
+const imgFull = im => im.fileId ? driveUrl(im.fileId, 2000) : im.data;
+const viaDrive = () => S.backend === 'shared' && S.store && typeof S.store.putImage === 'function';
 const readSidecar = () => { try { return JSON.parse(LS.get(IMG_LS)) || {}; } catch { return {}; } };
-const cardImages = ev => (ev.images && ev.images.length ? ev.images : (readSidecar()[ev.id] || []));
-function setCardImages(ev, list) {
-  if (imagesTravel()) { patchEvent(ev.id, { images: list }, { immediate: true }); renderEditor(); return; }
-  const all = readSidecar();
-  if (list.length) all[ev.id] = list; else delete all[ev.id];
-  LS.set(IMG_LS, JSON.stringify(all));
+const writeSidecar = all => LS.set(IMG_LS, JSON.stringify(all));
+const cardImages = ev => [...(ev.images || []), ...((readSidecar()[ev.id] || []).map(im => ({ ...im, local: true })))];
+function removeImage(ev, im) {
+  if (im.local) {
+    const all = readSidecar(); all[ev.id] = (all[ev.id] || []).filter(x => x.id !== im.id); if (!all[ev.id].length) delete all[ev.id]; writeSidecar(all);
+  } else {
+    patchEvent(ev.id, { images: (ev.images || []).filter(x => x.id !== im.id) }, { immediate: true });
+    if (im.fileId && S.store.deleteImage) S.store.deleteImage(im.fileId);
+  }
   renderEditor(); renderAll();
 }
 /* Photographs come off a phone far larger than a card needs, so each one is redrawn to a
@@ -2185,16 +2204,27 @@ async function addImages(ev, files) {
   const all = [...files];
   const pics = all.filter(f => f.type.startsWith('image/'));
   const skipped = all.length - pics.length;
-  const have = cardImages(ev);
-  const room = Math.max(0, MAX_IMAGES - have.length);
+  const room = Math.max(0, MAX_IMAGES - cardImages(ev).length);
   const over = Math.max(0, pics.length - room);
-  const added = [];
-  for (const f of pics.slice(0, room)) { try { added.push(await shrinkImage(f)); } catch (e) { console.warn(e); } }
-  S.imgNote = [skipped && 'Only pictures can go here.', over && `A card holds ${MAX_IMAGES} pictures.`].filter(Boolean).join(' ');
-  if (added.length) setCardImages(ev, [...have, ...added]); else renderEditor();
+  const travel = [], local = [];
+  let helperDown = false;
+  S.imgNote = pics.length ? 'Adding…' : ''; renderEditor();
+  for (const f of pics.slice(0, room)) {
+    let im; try { im = await shrinkImage(f); } catch (e) { console.warn(e); continue; }
+    if (viaDrive() && !helperDown) {
+      try { const fileId = await S.store.putImage(im); travel.push({ id: im.id, name: im.name, w: im.w, h: im.h, at: im.at, fileId }); continue; }
+      catch (e) { console.warn('picture stayed on the device', e); helperDown = true; }
+    }
+    if (viaDrive()) local.push(im); else travel.push(im);
+  }
+  if (travel.length) patchEvent(ev.id, { images: [...(S.events[ev.id].images || []), ...travel] }, { immediate: true });
+  if (local.length) { const side = readSidecar(); side[ev.id] = [...(side[ev.id] || []), ...local]; writeSidecar(side); }
+  S.imgNote = [skipped && 'Only pictures can go here.', over && `A card holds ${MAX_IMAGES} pictures.`,
+    helperDown && `The helper did not answer, so ${local.length === 1 ? 'that picture stays' : local.length + ' pictures stay'} on this device.`].filter(Boolean).join(' ');
+  renderEditor(); renderAll();
 }
 function lightbox(im) {
-  const box = el('div', { class: 'lightbox', onclick: () => box.remove() }, el('img', { src: im.data, alt: im.name }));
+  const box = el('div', { class: 'lightbox', onclick: () => box.remove() }, el('img', { src: imgFull(im), alt: im.name }));
   document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { box.remove(); document.removeEventListener('keydown', esc); } });
   document.body.append(box);
 }
@@ -2202,8 +2232,8 @@ function imagesPanel(ev) {
   const note = S.imgNote ? el('div', { class: 'img-note' }, S.imgNote) : null;
   const pics = cardImages(ev);
   const grid = el('div', { class: 'img-grid' }, pics.map(im => el('div', { class: 'img-cell' },
-    el('img', { src: im.data, alt: im.name, loading: 'lazy', onclick: () => lightbox(im) }),
-    el('button', { class: 'img-del', 'aria-label': `Remove ${im.name}`, onclick: () => setCardImages(ev, cardImages(ev).filter(x => x.id !== im.id)) }, icon('x')))));
+    el('img', { src: imgSrc(im), alt: im.name, loading: 'lazy', referrerpolicy: 'no-referrer', onclick: () => lightbox(im) }),
+    el('button', { class: 'img-del', 'aria-label': `Remove ${im.name}`, onclick: () => removeImage(ev, im) }, icon('x')))));
   const file = el('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true,
     onchange: e => { addImages(ev, e.target.files); e.target.value = ''; } });
   const drop = el('div', { class: 'img-drop',

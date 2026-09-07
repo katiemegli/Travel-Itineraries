@@ -53,6 +53,7 @@ a{color:inherit}
 .rule::before{content:"";display:inline-block;width:32px;height:1px;background:var(--ink-30);margin-right:12px;vertical-align:middle}
 
 #app{min-height:100dvh;display:flex;flex-direction:column}
+.sheet{display:flex;flex-direction:column;flex:1}
 
 /* ---------- a second skin, chosen per trip ----------
    Colour and type only: the board keeps every element, class and behaviour it has
@@ -142,12 +143,13 @@ body[data-theme="undertone"] .link .addtr,body[data-theme="undertone"] .link .ch
 body[data-theme="undertone"] .col:last-child{border-right:none}
 /* The tabs and everything below them ride on the design's half-opaque panel, blurred and
    lifted off the gradient, so the small type stays legible without flattening the colour. */
-/* One wash, not four. Each element that blurs its own backdrop can only sample within
-   itself, so neighbours meet at a visible edge; the gradient behind is smooth enough that
-   the blur was doing nothing anyway, and a plain half-opaque fill runs straight through. */
-body[data-theme="undertone"] .filters,body[data-theme="undertone"] .daynav,
-body[data-theme="undertone"] .main,body[data-theme="undertone"] .unsched-section{
-  background:rgba(255,255,255,.15);
+/* The tabs, the board and the ideas below it share the checklist's surface. It is painted on
+   the one sheet that holds all three, because an element that blurs its own backdrop can only
+   sample within itself, and three of them would meet at visible edges. */
+body[data-theme="undertone"] .sheet{
+  background:rgba(255,255,255,.3);
+  backdrop-filter:blur(40px) saturate(150%);
+  -webkit-backdrop-filter:blur(40px) saturate(150%);
 }
 body[data-theme="undertone"] .filters,body[data-theme="undertone"] .daynav{border-top:1px solid #000}
 body[data-theme="undertone"] .unsched-section{margin:0;padding-left:var(--sp-xl);padding-right:var(--sp-xl)}
@@ -533,16 +535,18 @@ dialog::backdrop{background:rgba(27,43,94,.4)}
 <body>
 <div id="app">
   <header class="top" id="top"></header>
+  <div class="sheet" id="sheet">
   <div class="filters" id="filters"></div>
   <div class="daynav" id="daynav" aria-label="Day"></div>
   <div class="main">
     <div class="board" id="board"></div>
-    <aside class="editor" id="editor" aria-label="Card details"></aside>
   </div>
   <section class="unsched-section" id="unsched" aria-label="Unscheduled ideas" data-drop=""></section>
+  </div>
   <nav class="bottom-nav" id="bottomnav" aria-label="Quick actions"></nav>
 </div>
 <div class="backdrop" id="backdrop"></div>
+<aside class="editor" id="editor" aria-label="Card details"></aside>
 <div class="grain" aria-hidden="true"></div>
 <dialog id="dlg"></dialog>
 
@@ -715,7 +719,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.24'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.25'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

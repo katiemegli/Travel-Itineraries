@@ -113,7 +113,7 @@ body[data-theme="undertone"]{
 body[data-theme="undertone"] .top{background:transparent;border-bottom:1px solid #000;box-shadow:none}
 body[data-theme="undertone"] .hero-pad{padding:56px 0 64px}
 /* Display text is the same face as everything else, set tight and large. */
-body[data-theme="undertone"] .trip-name{font:400 clamp(40px,5vw,72px)/1 var(--script);letter-spacing:-.03em;text-transform:capitalize}
+body[data-theme="undertone"] .trip-name{font:400 clamp(64px,10vw,150px)/1 var(--script);letter-spacing:-.035em;text-transform:capitalize}
 body[data-theme="undertone"] .trip-sub{font:400 14px/1.3 var(--sans);letter-spacing:-.01em;color:#000;margin-top:14px}
 body[data-theme="undertone"] .trip-kicker{font:500 12px/1.2 var(--sans);letter-spacing:.04em;margin-bottom:20px}
 body[data-theme="undertone"] .bar-title{font:500 14px/1.2 var(--script);letter-spacing:-.01em}
@@ -681,7 +681,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.17'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.18'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

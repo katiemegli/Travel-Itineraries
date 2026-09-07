@@ -574,7 +574,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.6'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.7'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -768,6 +768,87 @@ function migrateLondonTrip() {
   }
   saveTrip(t);
 }
+/* ---- the second trip ----
+   London and Copenhagen, kept from the Notion board it was planned on. It is written once,
+   with a marker left on the first trip so that deleting it here does not bring it back. */
+const LONDON_ID = 'trip-london-copenhagen';
+const LONDON_STAYS = [
+  { city: 'New York', from: '2026-08-21', to: '2026-08-22' },
+  { city: 'London', from: '2026-08-22', to: '2026-08-26' },
+  { city: 'Copenhagen', from: '2026-08-26', to: '2026-08-30' },
+];
+const LONDON_HOTELS = [
+  { name: 'Great Scotland Yard Hotel', from: '2026-08-22', to: '2026-08-26' },
+  { name: '1 Hotel Copenhagen', from: '2026-08-26', to: '2026-08-30' },
+];
+const LONDON_CARDS = [
+  { date: '2026-08-21', time: '19:30', title: 'Leave for airport', emoji: '🚗' },
+  { date: '2026-08-21', time: '22:00', title: 'JFK → LHR', emoji: '✈️', notes: { Katie: 'Lands 10:20 AM' }, transport: { mode: 'flight', mins: null } },
+  { date: '2026-08-22', time: '10:20', title: 'Arrive in London', emoji: '✈️' },
+  { date: '2026-08-22', time: '11:30', title: 'Hotel: Great Scotland Yard Hotel', emoji: '🏠', notes: { Katie: 'Check-in is at 3pm' } },
+  { date: '2026-08-22', time: '12:00', title: 'Lunch? Kiln? Malatang?', category: 'lunch' },
+  { date: '2026-08-22', time: '14:00', title: 'Big Ben', emoji: '🏰', category: 'activity', transport: { mode: 'walk', mins: 11 } },
+  { date: '2026-08-22', time: '17:30', title: 'Dishoom - Covent Garden', emoji: '🍛', category: 'dinner', resStatus: 'booked', transport: { mode: 'walk', mins: 12 } },
+  { date: '2026-08-23', time: '12:00', title: 'Schnitzel Heaven', emoji: '🍖', category: 'lunch', resStatus: 'booked', transport: { mode: 'subway', mins: 38 } },
+  { date: '2026-08-23', time: '17:30', title: 'Gymkhana', emoji: '🍗', category: 'dinner', resStatus: 'booked', transport: { mode: 'walk', mins: 22 } },
+  { date: '2026-08-24', time: '12:00', title: 'Borough Market', emoji: '🥪', category: 'lunch', notes: { Katie: 'Dorset Oysters Bar, The Ginger Pig, The Black Pig, Bread Ahead' }, transport: { mode: 'subway', mins: 18 } },
+  { date: '2026-08-24', time: '14:00', title: 'Glass flower workshop', emoji: '🌺', category: 'activity', resStatus: 'booked', reservation: '2.5 hrs', transport: { mode: 'walk', mins: 30 } },
+  { date: '2026-08-24', time: '17:00', title: 'Relax at Hotel & Get Ready', emoji: '👕', category: 'activity', transport: { mode: 'walk', mins: 30 } },
+  { date: '2026-08-24', time: '18:00', title: 'Osteria Angelina', emoji: '🍝', category: 'dinner', resStatus: 'booked', transport: { mode: 'subway', mins: 25 } },
+  { date: '2026-08-25', time: '12:00', title: 'Darwin Brasserie + Sky Garden', emoji: '🏙️', category: 'lunch', resStatus: 'booked', notes: { Katie: 'Sky Garden ticket comes w/ the restaurant booking :)' } },
+  { date: '2026-08-25', time: '18:00', title: 'Mountain Beak Street', emoji: '🥩', category: 'dinner', resStatus: 'booked', transport: { mode: 'walk', mins: 20 } },
+  { date: '2026-08-25', time: '20:00', title: 'SOMA Soho', emoji: '🍸', category: 'bar', resStatus: 'booked', transport: { mode: 'walk', mins: 4 } },
+  { date: '2026-08-25', time: '21:00', title: 'Oriole', emoji: '🍷', category: 'bar', resStatus: 'booked', transport: { mode: 'walk', mins: 11 } },
+  { date: '2026-08-25', time: '22:00', title: 'Three Sheets', emoji: '🍹', category: 'bar', resStatus: 'booked', transport: { mode: 'walk', mins: 6 } },
+  { date: '2026-08-26', time: '09:00', title: 'Leave for airport', emoji: '🚗' },
+  { date: '2026-08-26', time: '10:20', title: 'LHR → CPH', emoji: '✈️', notes: { Katie: 'Lands 1:20 PM' }, transport: { mode: 'flight', mins: null } },
+  { date: '2026-08-26', time: '14:00', title: 'Hotel: 1 Hotel Copenhagen', emoji: '🏠', notes: { Katie: 'Check-in is at 3pm' } },
+  { date: '2026-08-26', time: '14:30', title: 'studio x kitchen', emoji: '🍊', category: 'cafe', resStatus: 'walkin', notes: { Katie: 'Walk-in, probably has a line, maybe good to go on off hours' }, transport: { mode: 'walk', mins: 12 } },
+  { date: '2026-08-26', time: '18:00', title: 'Kødbyens Fiskebar', emoji: '🐟', category: 'dinner', resStatus: 'booked' },
+  { date: '2026-08-26', time: '20:00', title: 'GoBoat Picnic Boat', emoji: '🚤', category: 'activity', resStatus: 'booked', transport: { mode: 'walk', mins: 30 } },
+  { date: '2026-08-27', time: '12:00', title: 'La Banchina', emoji: '🏖️', category: 'lunch', resStatus: 'walkin', notes: { Katie: 'Swim and food!' } },
+  { date: '2026-08-27', time: '13:00', title: 'Hart Bakery', emoji: '🥐', category: 'cafe', transport: { mode: 'walk', mins: 3 } },
+  { date: '2026-08-27', time: '14:00', title: 'Tivoli Gardens', emoji: '🎡', category: 'activity', resStatus: 'booked', transport: { mode: 'walk', mins: 20 } },
+  { date: '2026-08-27', time: '17:30', title: 'Get to Hotel and Change', emoji: '👗', category: 'activity', transport: { mode: 'walk', mins: 12 } },
+  { date: '2026-08-27', time: '18:30', title: 'Vækst', emoji: '🌿', category: 'dinner', resStatus: 'booked', transport: { mode: 'walk', mins: 6 } },
+  { date: '2026-08-27', time: '20:00', title: 'bird downtown', emoji: '🍷', category: 'bar', resStatus: 'walkin', transport: { mode: 'walk', mins: 12 } },
+  { date: '2026-08-27', title: '1 hotel bar and lounge', emoji: '🍸', category: 'bar' },
+  { date: '2026-08-28', time: '12:00', title: 'Amator', emoji: '🔍', category: 'lunch', resStatus: 'booked', transport: { mode: 'subway', mins: 20 } },
+  { date: '2026-08-28', time: '13:00', title: 'Juno the Bakery', emoji: '🍞', category: 'cafe', notes: { Katie: '~30min wait in line, done by ~2pm. Cardamom buns!' }, transport: { mode: 'walk', mins: 12 } },
+  { date: '2026-08-28', time: '17:30', title: 'Back to hotel to change', emoji: '🏠', category: 'activity' },
+  { date: '2026-08-28', time: '18:00', title: 'Krogs Fiskerestaurant', emoji: '🐟', category: 'dinner', resStatus: 'booked', transport: { mode: 'walk', mins: 8 } },
+  { date: '2026-08-29', time: '08:00', title: 'Gym', emoji: '🏋️' },
+  { date: '2026-08-29', time: '10:25', title: 'TorvehallerneKBH', emoji: '🥐', category: 'cafe', transport: { mode: 'walk', mins: 6 } },
+  { date: '2026-08-29', time: '11:30', title: 'Sanku Maots\'ai Copenhagen - 三顾冒菜', emoji: '🍜', category: 'lunch', resStatus: 'walkin', transport: { mode: 'walk', mins: 6 } },
+  { date: '2026-08-29', time: '13:00', title: 'MENY', emoji: '🛒', category: 'activity', transport: { mode: 'walk', mins: 8 } },
+  { date: '2026-08-29', time: '14:00', title: 'Nyhavn', emoji: '⛵', category: 'activity', transport: { mode: 'walk', mins: 11 } },
+  { date: '2026-08-29', time: '15:30', title: 'Pack at Hotel', emoji: '🧳', category: 'activity', transport: { mode: 'walk', mins: 20 } },
+  { date: '2026-08-29', time: '17:30', title: 'Alouette', emoji: '🍰', category: 'dinner', resStatus: 'booked', transport: { mode: 'walk', mins: 9 } },
+  { date: '2026-08-30', time: '05:00', title: 'Leave for airport', emoji: '🚗' },
+  { date: '2026-08-30', time: '07:00', title: 'CPH → LHR', emoji: '✈️', notes: { Katie: 'Lands 8:10 AM' }, transport: { mode: 'flight', mins: null } },
+  { date: '2026-08-30', time: '13:20', title: 'LHR → JFK', emoji: '✈️', notes: { Katie: 'Lands 4:15 PM' }, transport: { mode: 'flight', mins: null } },
+];
+function seedLondonTrip() {
+  if (S.trips[LONDON_ID] || Object.values(S.trips).some(t => t.seedsDone && t.seedsDone.london)) return;
+  const t = newTrip({ name: 'London & Copenhagen', start: '2026-08-21', nDays: 0, travelers: ['Ryan', 'Katie'], cities: [] });
+  t.id = LONDON_ID; t.stays = clone(LONDON_STAYS); t.staysFixed = true;
+  t.hotels = LONDON_HOTELS.map(h => ({ id: uid(), ...h })); t.hotelsSeeded = true;
+  applyStays(t);
+  S.trips[t.id] = t; track(S.store.saveTrip(t));
+  LONDON_CARDS.forEach((row, i) => {
+    const ev = { ...newEvent(row.date), title: row.title, emoji: row.emoji || '', time: row.time || '',
+      category: row.category || '', resStatus: row.resStatus || '', booked: row.resStatus === 'booked',
+      reservation: row.reservation || '', notes: row.notes ? { ...row.notes } : {},
+      // the times from Notion stand in until Google works out its own, which then takes over
+      transport: { mins: null, mode: '', ...(row.transport || {}) }, order: i + 1, seed: SEED_V };
+    track(S.store.saveEvent(t.id, ev));
+  });
+  const first = Object.values(S.trips).filter(x => x.id !== LONDON_ID).sort((a, b) => a.createdAt - b.createdAt)[0];
+  const marker = first || t;
+  marker.seedsDone = { ...(marker.seedsDone || {}), london: 1 };
+  track(S.store.saveTrip(marker));
+}
+
 /* ---- the itinerary itself ----
    The flights, transfers and hotel nights Katie already had on one device, written once
    into the shared board so everyone who opens the link starts from the same trip. Cards are
@@ -1819,7 +1900,7 @@ function renderEditor() {
   const rst = { status: ev.resStatus || '', booked: ev.booked, reservation: ev.reservation };
   const resv = reservationField(rst, kind => { if (kind === 'toggle') patchEvent(ev.id, { resStatus: rst.status, booked: rst.booked }, { immediate: true }); else patchEvent(ev.id, { reservation: rst.reservation }); });
 
-  const archive = el('label', { class: 'switch' }, el('input', { type: 'checkbox', checked: !!ev.archived, onchange: e => patchEvent(ev.id, { archived: e.target.checked }, { immediate: true }) }), el('span', { style: 'color:var(--muted);font-size:13px' }, ev.archived ? 'Hidden from the board' : 'Showing on the board'));
+  const archive = el('label', { class: 'switch' }, el('input', { type: 'checkbox', checked: !!ev.archived, onchange: e => patchEvent(ev.id, { archived: e.target.checked }, { immediate: true }) }), el('span', { style: 'color:var(--muted);font-size:13px' }, 'Hide on board'));
 
   const travelers = t.travelers.length ? t.travelers : ['Notes'];
   const noteRows = travelers.map(who => {
@@ -1840,7 +1921,8 @@ function renderEditor() {
   const tr = ev.transport || { mins: null, mode: '' };
   const manual = !!(tr.mins || tr.mode);
   const autoLine = el('div', { class: 'auto-line', id: 'f-transport' });
-  if (ev.auto && ev.auto.mode) autoLine.append(transportChip(ev.auto), el('span', { class: 'why' }, ev.auto.est ? 'estimated from the two map pins' : ev.auto.src === 'osm' ? 'OpenStreetMap route' : 'Google Maps directions'), manual && el('span', { class: 'why' }, tr.override ? '· overridden below' : '· replaces the hand-entered time below'));
+  if (ev.auto && ev.auto.mode) autoLine.append(transportChip(ev.auto), el('span', { class: 'why' }, ev.auto.est ? 'estimated from the two map pins' : ev.auto.src === 'osm' ? 'OpenStreetMap route' : 'Google Maps directions'),
+    ...(manual ? [el('span', { class: 'why' }, tr.override ? '· overridden below' : '· replaces the hand-entered time below')] : []));
   else if (!hasCoords(ev)) autoLine.append(el('span', { class: 'why' }, 'Add a Google Maps link to this card and the one before it to get the travel time here.'));
   else autoLine.append(el('span', { class: 'why' }, 'Waiting for a located card before this one.'));
   const mins = el('input', { type: 'number', min: 0, step: 1, inputmode: 'numeric', placeholder: 'min', value: tr.mins ?? '',
@@ -2166,6 +2248,7 @@ async function boot() {
         const { trip: t, events } = sampleTrip();
         S.trips[t.id] = t; track(S.store.saveTrip(t)); for (const e of events) track(S.store.saveEvent(t.id, e));
       }
+      seedLondonTrip();
       const last = LS.get('bookshelf-of-memories/last-trip');
       const pick = S.trips[last] ? last : (Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt)[0] || {}).id || null;
       selectTrip(pick);

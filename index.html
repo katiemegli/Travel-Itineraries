@@ -676,7 +676,7 @@ const DEFAULT_MAPS_KEY = 'AIzaSyDuTwpPsxAUJLDjZVlwW1O07VozqSjrlNg';
 // Short Google Maps links (maps.app.goo.gl) only reveal their place by redirecting, which browsers hide from pages.
 // A tiny helper (see resolver.gs) follows the redirect server-side and returns the full link. Paste its URL in trip settings, or set it here.
 const RESOLVER_LS = 'bookshelf-of-memories/resolver-url';
-const DEFAULT_RESOLVER_URL = 'https://script.google.com/macros/s/AKfycbyzcM0a4Wk9sTGIr5C4mVcbfZ2CnrApPjrGAKD7tmULC0tz-OVcf0DtmJ_eAVnOQqm9/exec';
+const DEFAULT_RESOLVER_URL = 'https://script.google.com/macros/s/AKfycbykpZB7cgJRI8j_K_AEEJOWQHwMRlQwx8RWiW58UcWZ1uLJHaadQiNJpzY_r5mrYOnX/exec';
 
 /* ================= storage backends ================= */
 class LocalStore {
@@ -723,7 +723,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.27'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.28'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

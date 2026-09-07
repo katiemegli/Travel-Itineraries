@@ -508,7 +508,8 @@ const MODES = {
 const TIME_H = 325;
 const WALK_MAX = 35, TRANSIT_MAX = 45; // minutes: walk under 35, subway under 45, otherwise car
 const WALK_NO_CAR = 25;                 // a walk under 25 minutes hides the car option altogether
-const AUTO_V = 3;                       // bump when the row rules change so stored rows are recomputed
+const WALK_SHOW_MAX = 90;               // nobody is walking longer than this, so it stops being offered
+const AUTO_V = 4;                       // bump when the row rules change so stored rows are recomputed
 // List order doubles as the sort order for cards without a time.
 const DEFAULT_CATEGORIES = [
   { id: 'lunch',    name: 'Lunch',        emoji: '🥪', h: 40,  autoTime: '12:00', sortTime: '12:00' },
@@ -728,6 +729,47 @@ function migrateLondonTrip() {
   }
   saveTrip(t);
 }
+/* ---- the itinerary itself ----
+   The flights, transfers and hotel nights Katie already had on one device, written once
+   into the shared board so everyone who opens the link starts from the same trip. Cards are
+   matched by day and name: nothing is added on top of a card that is already there, and
+   anything either of them edits afterwards is left alone. */
+const SEED_V = 1;
+const SEED_ITINERARY = [
+  { date: '2026-12-03', time: '05:10', title: 'Arrive in Tokyo', emoji: '\u2708\ufe0f', resStatus: 'booked', transport: { mode: 'flight' } },
+  { date: '2026-12-03', time: '07:30', title: 'Hyatt Centric Ginza Tokyo', transport: { mode: 'drive', mins: 25 } },
+  { date: '2026-12-08', time: '08:45', title: 'Hyatt Centric Ginza Tokyo' },
+  { date: '2026-12-08', time: '09:25', title: 'Haneda Airport', transport: { mode: 'drive', mins: 24 } },
+  { date: '2026-12-13', time: '06:00', title: 'BKK Airport', resStatus: 'booked', notes: { Katie: 'Departs 8:05 AM' }, transport: { mode: 'drive', mins: 35 } },
+  { date: '2026-12-13', time: '16:00', title: 'Arrive at Narita International Airport', transport: { mode: 'flight' } },
+  { date: '2026-12-13', time: '17:00', title: 'Transport to Haneda Airport', notes: { Katie: 'Departs 7:45 PM' }, transport: { mode: 'drive', mins: 63 } },
+  { date: '2026-12-13', time: '18:30', title: 'John F. Kennedy International Airport', notes: { Katie: 'Arrive same day' }, transport: { mode: 'flight' } },
+];
+const seedKey = (date, title) => date + '|' + String(title || '').trim().toLowerCase();
+function seedItinerary() {
+  const t = trip(); if (!t || t.itinerarySeeded >= SEED_V || t.name !== 'Tokyo & Bangkok') return;
+  const have = new Set(Object.values(S.events).map(e => seedKey(e.date, e.title)));
+  let n = 0;
+  for (const row of SEED_ITINERARY) {
+    if (have.has(seedKey(row.date, row.title))) continue;
+    const ev = { ...newEvent(row.date), title: row.title, emoji: row.emoji || '', time: row.time || '',
+      resStatus: row.resStatus || '', booked: row.resStatus === 'booked', notes: row.notes ? { ...row.notes } : {},
+      transport: { mins: null, mode: '', override: true, ...(row.transport || {}) }, seed: SEED_V };
+    ev.order = ++n;
+    insertEvent(ev);
+  }
+  t.itinerarySeeded = SEED_V; saveTrip(t);
+}
+/* If a device that already had these cards syncs its own copies up later, the seeded twin steps aside. */
+function dropSeedDuplicates() {
+  const byKey = {};
+  for (const e of Object.values(S.events)) (byKey[seedKey(e.date, e.title)] ||= []).push(e);
+  for (const list of Object.values(byKey)) {
+    if (list.length < 2 || !list.some(e => e.seed)) continue;
+    const keep = list.find(e => !e.seed) || list[0];
+    for (const e of list) if (e !== keep && e.seed) deleteEvent(e.id);
+  }
+}
 function normalizeEvent(ev, t) {
   if (typeof ev.booked !== 'boolean') {
     const r = (ev.reservation || '').trim();
@@ -790,7 +832,7 @@ function selectTrip(id) {
     for (const e of list) next[e.id] = S.pending[e.id] || normalizeEvent(e, t);
     for (const pid in S.pending) if (!next[pid] && S.pending[pid]) next[pid] = S.pending[pid];
     S.events = next;
-    migrateLondonTrip(); fixStayOrder(); seedHotels();
+    migrateLondonTrip(); fixStayOrder(); seedHotels(); seedItinerary(); dropSeedDuplicates();
     renderAll(); refreshEditor();
   }, e => { S.lastError = 'Lost connection to shared trip'; setStatus(); });
   renderAll();
@@ -1117,10 +1159,11 @@ async function duration(a, b, mode) {
   } catch (e) { if (!/ZERO_RESULTS/.test(String(e))) { console.warn(e); S.maps.error = 'Directions failed: ' + (e.message || e); } }
   durCache.set(k, mins); return mins;
 }
-const withAlts = (primary, all) => { // the chosen way first, every other option after it; a short walk drops the car
+const withAlts = (primary, all) => { // the chosen way first, then the rest; a short walk drops the car, a very long one drops itself
   const walk = all.find(x => x && x.mode === 'walk');
   const shortWalk = walk && walk.mins < WALK_NO_CAR;
-  return { ...primary, v: AUTO_V, alts: all.filter(x => x && x.mode !== primary.mode && !(shortWalk && x.mode === 'drive')) };
+  const drop = x => (shortWalk && x.mode === 'drive') || (x.mode === 'walk' && x.mins > WALK_SHOW_MAX);
+  return { ...primary, v: AUTO_V, alts: all.filter(x => x && x.mode !== primary.mode && !drop(x)) };
 };
 async function googlePair(a, b) {
   // Walk under 35, else subway under 45, else car. Every option Google returns is shown.
@@ -1173,7 +1216,8 @@ async function updateAutoTransport() {
         S.autoDone ||= {};
         if (S.autoDone[key] >= available && b.auto && b.auto.key === key) continue; // already computed this session: never flip back and forth
         const from = a.hotel ? 'hotel' : 'card';
-        if (haversine(a.place, b.place) > 300000) { // different cities: no sensible leg
+        const metres = haversine(a.place, b.place);
+        if (metres > 300000 || metres < 80) { // another city, or the same doorstep: no leg worth showing
           if (!b.auto || b.auto.key !== key || !b.auto.none) patchEvent(b.id, { auto: { key, none: true, v: AUTO_V, rank: available, from, at: Date.now() } }, { immediate: true });
           S.autoDone[key] = available; continue;
         }

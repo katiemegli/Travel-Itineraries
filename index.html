@@ -726,7 +726,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.30'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.31'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -765,11 +765,14 @@ class ScriptStore {
     if (!j.ok) { this.hint = j.error || 'The shared board refused the change.'; throw new Error(this.hint); }
     this.hint = ''; this.v = j.v;
   }
-  /* A helper set to "Anyone with Google account" answers a sign-in page instead of JSON. */
+  /* A helper set to "Anyone with Google account" answers a sign-in page instead of JSON; one that
+     was never allowed to use Drive answers a page saying authorisation is required. */
   readHint(text) {
-    return /<html|accounts\.google|sign in/i.test(String(text))
-      ? 'The shared board is asking visitors to sign in. In Apps Script, set the deployment\'s "Who has access" to Anyone.'
-      : 'The shared board answered with something unexpected.';
+    const t = String(text);
+    if (/authori[sz]ation is required|authori[sz]ation required|ScriptError/i.test(t)) return 'The helper has not been allowed to use Drive yet. In Apps Script, run folder_ once and accept the permission.';
+    if (/<html|accounts\.google|sign in/i.test(t)) return 'The shared board is asking visitors to sign in. In Apps Script, set the deployment\'s "Who has access" to Anyone.';
+    const m = t.match(/Exception:?\s*([^<\n]{5,140})/i); if (m) return 'The helper said: ' + m[1].trim();
+    return 'The shared board answered with something unexpected.';
   }
   async send(body) {
     try { await this.raw(body); }
@@ -2227,14 +2230,14 @@ async function addImages(ev, files) {
     let im; try { im = await shrinkImage(f); } catch (e) { console.warn(e); continue; }
     if (viaDrive() && !helperDown) {
       try { const fileId = await S.store.putImage(im); travel.push({ id: im.id, name: im.name, w: im.w, h: im.h, at: im.at, fileId }); continue; }
-      catch (e) { console.warn('picture stayed on the device', e); helperDown = true; }
+      catch (e) { console.warn('picture stayed on the device', e); helperDown = (e && e.message) || true; }
     }
     if (viaDrive()) local.push(im); else travel.push(im);
   }
   if (travel.length) patchEvent(ev.id, { images: [...(S.events[ev.id].images || []), ...travel] }, { immediate: true });
   if (local.length) { const side = readSidecar(); side[ev.id] = [...(side[ev.id] || []), ...local]; writeSidecar(side); }
   S.imgNote = [skipped && 'Only pictures can go here.', over && `A card holds ${MAX_IMAGES} pictures.`,
-    helperDown && `The helper did not answer, so ${local.length === 1 ? 'that picture stays' : local.length + ' pictures stay'} on this device.`].filter(Boolean).join(' ');
+    helperDown && `${typeof helperDown === 'string' ? helperDown : 'The helper did not answer.'} ${local.length === 1 ? 'That picture stays' : local.length + ' pictures stay'} on this device.`].filter(Boolean).join(' ');
   renderEditor(); renderAll();
 }
 function lightbox(im) {

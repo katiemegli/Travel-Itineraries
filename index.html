@@ -204,9 +204,9 @@ body[data-theme="undertone"] body,body[data-theme="undertone"]{background:#111}
 .col-head .dow{font:400 36px/1.1 var(--script)}
 .col-head .sub{font:400 11px/1.4 var(--sans);letter-spacing:.1em;color:var(--ink-50);margin-top:4px}
 .col-head .date{font:400 10px/1.4 var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-60)}
-.col-head .right{display:flex;align-items:baseline;gap:var(--sp-sm)}
+.col-head .right{display:flex;align-items:center;gap:var(--sp-sm)}
 .col-head .cnt{display:none}
-.col-head .menu{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;color:var(--ink-40);align-self:center}
+.col-head .menu{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;color:var(--ink-40)}
 .col-head .menu:hover{color:var(--ink)}
 .col-head .menu svg{width:16px;height:16px}
 .col-body{flex:none;display:flex;flex-direction:column;position:relative}
@@ -673,7 +673,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.12'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.13'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

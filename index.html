@@ -1052,7 +1052,7 @@ function renderTop() {
         el('h1', { class: 'trip-name', style: 'margin:0', role: 'button', tabindex: '0', title: 'Trips and settings', onclick: e => tripMenu(e.currentTarget) }, ...fancyName(name)),
         el('p', { class: 'trip-sub', style: 'margin-bottom:0' }, sub)),
       renderChecklist(t),
-      el('button', { class: 'scroll-cue', 'aria-label': 'Collapse the header', onclick: collapseHero }, el('span', {}, 'To the itinerary!'), icon('arrowup'))))));
+      el('button', { class: 'scroll-cue', 'aria-label': 'Collapse the header', onclick: collapseHero }, el('span', {}, 'To the itinerary!'), icon('arrowdown'))))));
   setStatus();
 }
 /* Planner checklist: for Lunch, Activity and Dinner, the days that still have nothing in that category. */

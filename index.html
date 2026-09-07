@@ -94,6 +94,11 @@ a{color:inherit}
 .fchip[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--ink)}
 .fchip .n{opacity:.5}
 
+.daynav{display:none;align-items:center;justify-content:space-between;gap:12px;padding:16px var(--sp-lg) 4px}
+.daynav-btn{width:44px;height:44px;border:1px solid var(--ink-20);display:inline-flex;align-items:center;justify-content:center;color:var(--ink);flex:none;transition:background .3s,color .3s}
+.daynav-btn:disabled{opacity:.25}
+.daynav-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5}
+.daynav-pick{flex:1;height:44px;border:0;border-bottom:1px solid var(--ink-20);background:transparent;font:400 11px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--ink);text-align:center;text-align-last:center;padding:0 8px;appearance:none;-webkit-appearance:none}
 /* ---------- board (timeline) ---------- */
 .main{flex:1;display:flex;align-items:flex-start;position:relative;padding-top:var(--sp-lg)}
 .board{flex:1;min-width:0;overflow-x:auto;display:flex;gap:48px;padding:var(--sp-lg) var(--sp-xl) 96px;align-items:flex-start;scroll-snap-type:x proximity;scroll-padding-left:var(--sp-xl);-webkit-overflow-scrolling:touch;scrollbar-width:none}
@@ -368,7 +373,8 @@ dialog::backdrop{background:rgba(27,43,94,.4)}
   .status .txt{display:none}
   .trip-name{font-size:64px}
   .trip-sub{font-size:18px}
-  .filters{padding:var(--sp-md) var(--sp-lg) 0}
+  .filters{display:none}
+  .daynav{display:flex}
   .main{padding-top:var(--sp-sm)}
   .board{gap:24px;padding:var(--sp-md) var(--sp-lg) var(--sp-xxl);scroll-snap-type:x mandatory;scroll-padding-left:var(--sp-lg)}
   .col{flex-basis:calc(100vw - 48px);width:calc(100vw - 48px)}
@@ -393,6 +399,7 @@ dialog::backdrop{background:rgba(27,43,94,.4)}
 <div id="app">
   <header class="top" id="top"></header>
   <div class="filters" id="filters"></div>
+  <div class="daynav" id="daynav" aria-label="Day"></div>
   <div class="main">
     <div class="board" id="board"></div>
     <aside class="editor" id="editor" aria-label="Card details"></aside>
@@ -712,7 +719,7 @@ function saveTrip(t, { debounced } = {}) {
 }
 function selectTrip(id) {
   if (S.tripId === id) return;
-  S.tripId = id; S.events = {}; S.pending = {}; closeEditor();
+  S.tripId = id; S.events = {}; S.pending = {}; S.day = null; S.dayJump = 'instant'; closeEditor();
   LS.set('bookshelf-of-memories/last-trip', id);
   if (S.unsubEvents) { S.unsubEvents(); S.unsubEvents = null; }
   if (!id) { renderAll(); return; }
@@ -1199,7 +1206,36 @@ function fancyName(name) {
   const last = parts.pop();
   return [parts.join(' '), el('br'), el('em', {}, last)];
 }
+/* Phone day navigator: previous / day picker / next. Lands on today's day during the trip, the first day before it, the last day after it. */
+const isPhone = () => window.matchMedia('(max-width:760px)').matches;
+function defaultDay(t) {
+  const td = today();
+  if (t.days.includes(td)) return td;
+  if (t.days.length && td > t.days[t.days.length - 1]) return t.days[t.days.length - 1];
+  return t.days[0] || '';
+}
+function renderDayNav() {
+  const nav = $('#daynav'); if (!nav) return; nav.replaceChildren();
+  const t = trip(); if (!t || !t.days.length) return;
+  if (!S.day || !t.days.includes(S.day)) { S.day = defaultDay(t); S.dayJump = S.dayJump || 'instant'; }
+  const i = t.days.indexOf(S.day);
+  const go = k => { S.day = t.days[Math.max(0, Math.min(t.days.length - 1, k))]; S.dayJump = 'smooth'; renderDayNav(); scrollToDay(); };
+  const label = d => `${parseDate(d).toLocaleDateString(undefined, { weekday: 'short' })}, ${fmtDate(d, { month: 'short', day: 'numeric' })}` + (staysOn(t, d).length ? ` · ${staysOn(t, d).map(x => x.city).join(' → ')}` : '');
+  nav.append(
+    el('button', { class: 'daynav-btn', 'aria-label': 'Previous day', disabled: i <= 0, onclick: () => go(i - 1) }, icon('backline')),
+    el('select', { class: 'daynav-pick', 'aria-label': 'Pick a day', onchange: e => { S.day = e.target.value; S.dayJump = 'smooth'; renderDayNav(); scrollToDay(); } },
+      t.days.map(d => el('option', { value: d, selected: d === S.day }, label(d)))),
+    el('button', { class: 'daynav-btn', 'aria-label': 'Next day', disabled: i >= t.days.length - 1, onclick: () => go(i + 1) }, icon('arrow')));
+}
+function scrollToDay() {
+  if (!isPhone() || !S.day) return;
+  const board = $('#board'); const col = board && board.querySelector(`.col[data-date="${S.day}"]`); if (!col) return;
+  const left = col.offsetLeft - parseFloat(getComputedStyle(board).paddingLeft);
+  S.syncing = true; board.scrollTo({ left, behavior: S.dayJump === 'smooth' ? 'smooth' : 'instant' }); S.dayJump = '';
+  setTimeout(() => { S.syncing = false; }, 600);
+}
 function renderFilters() {
+  renderDayNav();
   const f = $('#filters'); f.replaceChildren();
   const t = trip(); if (!t) return;
   const all = Object.values(S.events);
@@ -1237,6 +1273,7 @@ function renderBoard() {
   board.append(el('div', { class: 'col addday' }, el('div', { class: 'col-head' }, el('div', { class: 'dow', style: 'opacity:0' }, ' ')),
     el('div', { class: 'col-body' }, el('button', { class: 'addday-btn', onclick: () => addDay(t, t.days.length ? addDays(t.days[t.days.length - 1], 1) : today()) }, icon('plus'), t.days.length ? 'Add a day' : 'Add first day'))));
   board.scrollLeft = scrollLeft;
+  if (S.dayJump) scrollToDay();
   board.querySelectorAll('.col-body').forEach(b => { if (scrolls[b.dataset.date]) b.scrollTop = scrolls[b.dataset.date]; });
   scheduleAuto();
 }
@@ -1872,6 +1909,17 @@ if (LS.get(HERO_LS)) document.body.classList.add('hero-collapsed');
 async function boot() {
   renderTop(); renderBoard();
   $('#backdrop').addEventListener('click', closeEditor);
+  let swipeTimer = 0;
+  $('#board').addEventListener('scroll', () => {
+    if (!isPhone() || S.syncing) return;
+    clearTimeout(swipeTimer);
+    swipeTimer = setTimeout(() => {
+      const board = $('#board'); const pad = parseFloat(getComputedStyle(board).paddingLeft);
+      let best = null, bd = Infinity;
+      board.querySelectorAll('.col[data-date]').forEach(c => { if (!c.dataset.date) return; const d = Math.abs(c.offsetLeft - pad - board.scrollLeft); if (d < bd) { bd = d; best = c.dataset.date; } });
+      if (best && best !== S.day) { S.day = best; renderDayNav(); }
+    }, 120);
+  }, { passive: true });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (openPop) closePop(); else if (S.editingId && !$('#dlg').open) closeEditor(); } });
   window.addEventListener('beforeunload', () => { for (const id in S.pending) flushEvent(id); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) for (const id in S.pending) flushEvent(id); });

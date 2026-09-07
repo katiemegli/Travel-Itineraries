@@ -240,6 +240,13 @@ a{color:inherit}
 .auto-line .why{color:var(--ink-60);font:300 12px/1.6 var(--mincho)}
 .section-h{font:400 10px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-50);margin-top:16px}
 .dlg .prop{grid-template-columns:130px 1fr}
+.tut-hero{text-align:center;padding:8px 0 16px;border-bottom:1px solid var(--ink-20)}
+.tut-title{font:300 italic 56px/1 var(--script);margin:0 0 16px}
+.tut-lead{font:300 15px/1.8 var(--mincho);color:var(--ink-80);margin:0;max-width:440px;margin-inline:auto}
+.tut-step{padding:8px 0 4px}
+.tut-step .label{display:flex;align-items:center;margin-bottom:10px}
+.tut-body{font:300 14px/1.8 var(--mincho);color:var(--ink-80);margin:0}
+@media (max-width:760px){.tut-title{font-size:44px}}
 
 /* ---------- popover / dialogs ---------- */
 .pop{position:fixed;z-index:50;background:var(--paper);border:1px solid var(--ink-20);box-shadow:var(--shadow-lg);padding:6px 0;min-width:240px;max-width:min(320px,calc(100vw - 24px))}
@@ -286,11 +293,20 @@ dialog::backdrop{background:rgba(27,43,94,.4)}
 .check-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0 48px}
 .check-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--ink-20);margin-bottom:8px}
 .check-title{font:400 30px/1.1 var(--script);margin:0}
-.check-sub{font:400 10px/1.4 var(--sans);letter-spacing:.1em;color:var(--ink-50);margin:4px 0 0}
+.check-box{width:14px;height:14px;flex:none;border:1px solid var(--ink-30);display:inline-flex;align-items:center;justify-content:center;color:var(--paper);background:transparent;transition:background .3s,border-color .3s}
+.check-box svg{width:10px;height:10px}
+.check-day.done .check-box{background:var(--ink);border-color:var(--ink)}
+.check-day.done{cursor:default}
+.check-day.done:hover{opacity:1}
+.check-day.done .check-date{color:var(--ink-50)}
+.check-day .check-date{flex:1}
+.confetti-layer{position:fixed;inset:0;pointer-events:none;z-index:120;overflow:hidden}
+.confetti{position:absolute;width:8px;height:8px;animation:confetti-fall 4s linear forwards}
+@keyframes confetti-fall{0%{transform:translateY(-10vh) rotate(0deg);opacity:1}100%{transform:translateY(110vh) rotate(360deg);opacity:0}}
 .check-count{font:400 10px/1.4 var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-60);white-space:nowrap}
 .check-list{list-style:none;margin:0;padding:0}
 .check-list li{background-image:var(--dotted);background-position:bottom;background-size:6px 1px;background-repeat:repeat-x}
-.check-day{display:flex;justify-content:space-between;align-items:baseline;gap:12px;width:100%;text-align:left;padding:14px 0;transition:opacity .2s;min-height:44px}
+.check-day{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:14px 0;transition:opacity .2s;min-height:44px;color:inherit}
 .check-day:hover{opacity:.6}
 .check-date{font:400 11px/1.4 var(--sans);letter-spacing:.15em;text-transform:uppercase;color:var(--ink)}
 .check-city{font:300 13px/1.4 var(--mincho);color:var(--ink-60)}
@@ -399,6 +415,7 @@ const ICONS = {
   plusfill: '<svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>',
   arrow: '<svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
   arrowdown: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+  tick: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   arrowup: '<svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
   dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   grip: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>',
@@ -440,7 +457,7 @@ const WALK_MAX = 35, TRANSIT_MAX = 45; // minutes: walk under 35, subway under 4
 const DEFAULT_CATEGORIES = [
   { id: 'lunch',    name: 'Lunch',        emoji: '🥪', h: 40,  autoTime: '12:00', sortTime: '12:00' },
   { id: 'cafe',     name: 'Dessert/Cafe', emoji: '🍰', h: 330, sortTime: '14:30' },
-  { id: 'activity', name: 'Activity',     emoji: '🎟️', h: 210, sortTime: '15:00' },
+  { id: 'activity', name: 'Afternoon',    emoji: '🎟️', h: 210, sortTime: '15:00' },
   { id: 'dinner',   name: 'Dinner',       emoji: '🍽️', h: 18,  autoTime: '17:30', sortTime: '17:30' },
   { id: 'bar',      name: 'Bar',          emoji: '🍸', h: 275, sortTime: '20:30' },
 ];
@@ -520,6 +537,7 @@ function normalizeTrip(t) {
   const ids = new Set(t.categories.map(c => c.id));
   if (!['lunch', 'dinner', 'bar', 'cafe', 'activity'].some(id => ids.has(id)) && [...ids].some(id => LEGACY_CAT[id])) t.categories = clone(DEFAULT_CATEGORIES);
   t.travelers ||= []; t.cities ||= []; t.days ||= []; t.stays ||= [];
+  const act = t.categories.find(c => c.id === 'activity'); if (act && act.name === 'Activity') act.name = 'Afternoon';
   return t;
 }
 /* Stays: which city the trip is in on each date. Days and the city list follow from them. */
@@ -946,12 +964,14 @@ async function duration(a, b, mode) {
   durCache.set(k, mins); return mins;
 }
 async function googlePair(a, b) {
+  // Walk under 35, else subway under 45 (then car), else car. The subway time is always shown when Google has one.
   const walk = await duration(a, b, 'WALKING');
-  if (walk != null && walk < WALK_MAX) return { mode: 'walk', mins: walk };
   const transit = await duration(a, b, 'TRANSIT');
+  const subway = transit != null ? { mode: 'subway', mins: transit } : null;
+  if (walk != null && walk < WALK_MAX) return { mode: 'walk', mins: walk, alts: subway ? [subway] : [] };
   const drive = await duration(a, b, 'DRIVING');
-  if (transit != null && transit < TRANSIT_MAX) return { mode: 'subway', mins: transit, alt: drive != null ? { mode: 'drive', mins: drive } : null }; // subway, with the car time after it
-  if (drive != null) return { mode: 'drive', mins: drive };
+  if (transit != null && transit < TRANSIT_MAX) return { mode: 'subway', mins: transit, alts: drive != null ? [{ mode: 'drive', mins: drive }] : [] };
+  if (drive != null) return { mode: 'drive', mins: drive, alts: subway ? [subway] : [] };
   if (transit != null) return { mode: 'subway', mins: transit };
   if (walk != null) return { mode: 'walk', mins: walk };
   return null;
@@ -984,7 +1004,7 @@ async function updateAutoTransport() {
         const key = a ? pairKey(a, b) : '';
         if (!key) { if (b.auto) patchEvent(b.id, { auto: null }, { immediate: true }); continue; }
         const available = mapsReady() ? 2 : osmOk() ? 1 : 0; // google > openstreetmap > straight-line estimate
-        if (b.auto && b.auto.key === key && (b.auto.rank || 0) >= available && !(b.auto.mode === 'subway' && b.auto.rank === 2 && b.auto.alt === undefined)) continue;
+        if (b.auto && b.auto.key === key && (b.auto.rank || 0) >= available && !(b.auto.rank === 2 && b.auto.alts === undefined)) continue; // rows from before the subway rule are recomputed
         let r = null;
         if (mapsReady()) { try { r = await googlePair(a, b); } catch (e) { console.warn(e); } }
         if (r) r.rank = 2;
@@ -1032,32 +1052,58 @@ function renderTop() {
         el('h1', { class: 'trip-name', style: 'margin:0', role: 'button', tabindex: '0', title: 'Trips and settings', onclick: e => tripMenu(e.currentTarget) }, ...fancyName(name)),
         el('p', { class: 'trip-sub', style: 'margin-bottom:0' }, sub)),
       renderChecklist(t),
-      el('button', { class: 'scroll-cue', 'aria-label': 'Collapse the header', onclick: collapseHero }, el('span', {}, 'Collapse'), icon('arrowup'))))));
+      el('button', { class: 'scroll-cue', 'aria-label': 'Collapse the header', onclick: collapseHero }, el('span', {}, 'To the itinerary!'), icon('arrowup'))))));
   setStatus();
 }
 /* Planner checklist: for Lunch, Activity and Dinner, the days that still have nothing in that category. */
-const CHECKLIST = [['lunch', 'Lunch'], ['activity', 'Activity'], ['dinner', 'Dinner']];
+const CHECKLIST = [['lunch', 'Lunch'], ['activity', 'Afternoon'], ['dinner', 'Dinner']];
+const planDaysOf = t => t.days.length > 2 ? t.days.slice(1, -1) : t.days; // the first and last days are travel days
+const hasCat = (id, d) => Object.values(S.events).some(e => !e.archived && e.category === id && e.date === d);
 function renderChecklist(t) {
   const box = el('section', { class: 'checklist', 'aria-label': 'Planner checklist' },
     el('div', { class: 'label rule' }, 'Planner checklist'));
   const grid = el('div', { class: 'check-grid' });
+  const days = planDaysOf(t);
   for (const [id, name] of CHECKLIST) {
     const cat = catOf(id) || { name };
-    const planDays = t.days.length > 2 ? t.days.slice(1, -1) : t.days; // the first and last days are travel days
-    const missing = planDays.filter(d => !Object.values(S.events).some(e => !e.archived && e.category === id && e.date === d));
+    const missing = days.filter(d => !hasCat(id, d)).length;
     const col = el('div', { class: 'check-col' },
       el('div', { class: 'check-head' },
-        el('div', {}, el('h3', { class: 'check-title' }, cat.name), el('p', { class: 'check-sub' }, missing.length ? 'Still to plan' : 'All planned')),
-        el('span', { class: 'check-count' }, `${missing.length} day${missing.length === 1 ? '' : 's'}`)),
-      el('ul', { class: 'check-list' }, missing.length
-        ? missing.map(d => el('li', {}, el('button', { class: 'check-day', onclick: () => addCardDialog(d, id), title: `Add ${cat.name.toLowerCase()} on ${fmtDate(d)}` },
-            el('span', { class: 'check-date' }, fmtDate(d, { month: 'short', day: 'numeric' }) + ' / ' + parseDate(d).toLocaleDateString(undefined, { weekday: 'short' })),
-            el('span', { class: 'check-city' }, staysOn(t, d).map(x => x.city).join(' → ')))))
-        : [el('li', { class: 'check-done' }, 'Every day has one.')]));
+        el('h3', { class: 'check-title' }, cat.name),
+        el('span', { class: 'check-count' }, `${missing} day${missing === 1 ? '' : 's'}`)),
+      el('ul', { class: 'check-list' }, days.map(d => {
+        const done = hasCat(id, d);
+        const label = fmtDate(d, { month: 'short', day: 'numeric' }) + ' / ' + parseDate(d).toLocaleDateString(undefined, { weekday: 'short' });
+        const row = el(done ? 'div' : 'button', { class: 'check-day' + (done ? ' done' : ''), ...(done ? {} : { onclick: () => addCardDialog(d, id), title: `Add ${cat.name.toLowerCase()} on ${fmtDate(d)}` }) },
+          el('span', { class: 'check-box', role: 'checkbox', 'aria-checked': String(done), 'aria-label': `${cat.name} on ${label}` }, done ? icon('tick') : null),
+          el('span', { class: 'check-date' }, label),
+          el('span', { class: 'check-city' }, staysOn(t, d).map(x => x.city).join(' → ')));
+        return el('li', {}, row);
+      })));
     grid.append(col);
   }
   box.append(grid);
+  celebrateCompleteDays(t, days);
   return box;
+}
+/* Confetti the first time a day has lunch, afternoon and dinner. Days already complete when the board opens don't fire. */
+S.celebrated = null;
+function celebrateCompleteDays(t, days) {
+  const complete = new Set(days.filter(d => CHECKLIST.every(([id]) => hasCat(id, d))));
+  if (S.celebrated === null || S.celebrated.trip !== t.id) { S.celebrated = { trip: t.id, days: complete }; return; }
+  const fresh = [...complete].filter(d => !S.celebrated.days.has(d));
+  S.celebrated.days = complete;
+  if (fresh.length) confetti();
+}
+function confetti() {
+  const layer = el('div', { class: 'confetti-layer', 'aria-hidden': 'true' });
+  const colors = ['#87BADB', '#FAF3E0', '#D4AF37', '#aee1f9', '#E8DCC8'];
+  for (let i = 0; i < 40; i++) {
+    const size = Math.random() * 8 + 4;
+    layer.append(el('div', { class: 'confetti', style: `left:${Math.random() * 100}vw;top:-20px;width:${size}px;height:${size}px;background-color:${colors[Math.floor(Math.random() * colors.length)]};border-radius:${Math.random() < .5 ? '50%' : '2px'};animation-delay:${Math.random() * 4}s;opacity:${Math.random()}` }));
+  }
+  document.body.append(layer);
+  setTimeout(() => layer.remove(), 8500);
 }
 /* "Bangkok & Tokyo" sets as Bangkok & <em>Tokyo</em>, like the design's two-line title. */
 function fancyName(name) {
@@ -1145,7 +1191,8 @@ function transportChip(tr, attrs = {}, tag = 'span') {
   const parts = [];
   if (tr.mins) parts.push(`${tr.est ? '~' : ''}${tr.mins} min`);
   if (m) parts.push(m.label);
-  const alt = tr.alt && MODES[tr.alt.mode] ? [' · ', el('span', { 'aria-hidden': 'true' }, MODES[tr.alt.mode].icon), ` ${tr.alt.mins} min ${MODES[tr.alt.mode].label}`] : [];
+  const alts = (tr.alts || (tr.alt ? [tr.alt] : [])).filter(x => x && MODES[x.mode]);
+  const alt = alts.flatMap(x => [' · ', el('span', { 'aria-hidden': 'true' }, MODES[x.mode].icon), ` ${x.mins} min ${MODES[x.mode].label}`]);
   return el(tag, { class: 'chip' + (m ? ' tone' : '') + (tr.est ? ' est' : ''), style: m ? `--h:${m.h}` : '', ...attrs }, m && el('span', { 'aria-hidden': 'true' }, m.icon), parts.join(' '), ...alt);
 }
 function renderCard(ev) {
@@ -1253,8 +1300,10 @@ function placeField(state, cityArg, onChange, { placeholder } = {}) {
   const redraw = () => { const nl = placeLine(state.place, { ...state, onClear: state.place ? () => { state.place = null; state.needsName = false; redraw(); onChange(); } : null }); line.replaceWith(nl); line = nl; };
   const run = async () => {
     const v = inp.value.trim();
-    if (!v) { state.title = ''; state.place = null; state.needsName = false; redraw(); onChange(); return; }
+    if (!v) { state.title = ''; state.place = null; state.needsName = false; state.lastRun = ''; redraw(); onChange(); return; }
     const link = splitShare(v) ? parseMapsLink(splitShare(v).url) : null;
+    if (!link && v === state.lastRun) return; // same text as the last lookup: nothing to do
+    state.lastRun = v;
     if (!link && state.title === v && state.place && state.place.source !== 'link') return; // unchanged name, keep the found place
     if (!link && state.place && state.place.source === 'link') {                                // naming a pasted pin: keep the link, fetch the rest
       state.title = v; state.needsName = false; state.place.name = v;
@@ -1422,8 +1471,10 @@ function renderEditor() {
   const pst = { title: ev.place && ev.place.name ? ev.place.name : '', place: ev.place, busy: false, needsName: false, promise: null };
   const pf = placeField(pst, () => cityFor(t, S.events[ev.id] ? S.events[ev.id].date : ev.date), () => {
     if (pst.busy) return;
+    const cur = S.events[ev.id] || ev;
     const changes = { place: pst.place ? { ...pst.place, name: pst.place.name || pst.title } : null };
-    if (!ev.title && pst.title) changes.title = pst.title;
+    if (!cur.title && pst.title) changes.title = pst.title;
+    if (JSON.stringify(changes.place) === JSON.stringify(cur.place || null) && changes.title === undefined) return; // nothing changed
     patchEvent(ev.id, changes, { immediate: true });
   }, { placeholder: 'Google Maps link or place name' });
   const openLink = mapsUrl(ev) ? el('a', { class: 'action-link', href: mapsUrl(ev), target: '_blank', rel: 'noopener' }, 'Open in Google Maps', icon('arrow')) : null;
@@ -1533,6 +1584,7 @@ function tripMenu(anchor) {
     'hr',
     { label: '+ New trip', onclick: () => newTripDialog() },
     trip() && { label: 'Trip settings', onclick: () => settingsDialog() },
+    { label: 'Show the tour', onclick: () => tutorialDialog() },
   ].filter(Boolean));
 }
 function dayMenu(anchor, t, date) {
@@ -1552,6 +1604,25 @@ function dialog(content) {
   const d = $('#dlg'); d.replaceChildren(el('div', { class: 'dlg' }, ...content)); d.showModal(); return d;
 }
 const splitList = s => s.split(',').map(x => x.trim()).filter(Boolean);
+/* First-visit tutorial. Reopen it any time from the trip menu. */
+const TUTORIAL_LS = 'bookshelf-of-memories/tutorial-seen';
+function tutorialDialog() {
+  const step = (n, title, body) => el('div', { class: 'tut-step' },
+    el('div', { class: 'label rule' }, `No. ${n} ${title}`),
+    el('p', { class: 'tut-body' }, body));
+  const d = dialog([
+    el('div', { class: 'tut-hero' },
+      el('p', { class: 'label', style: 'letter-spacing:.4em;margin:0 0 12px' }, 'Welcome'),
+      el('h2', { class: 'tut-title' }, 'Hi Ryan'),
+      el('p', { class: 'tut-lead' }, 'This is our Bangkok & Tokyo board. One column per day, one line per stop. A quick tour:')),
+    step(1, 'The checklist', 'The blue section keeps a Planner checklist with three columns: Lunch, Afternoon and Dinner. The number in each corner is how many days still have nothing in that column, and every day is listed underneath with a box. Tap an unticked date to add something for it; the box ticks itself once that day has one.'),
+    step(2, 'Every day is a celebration', 'When a day has all three, lunch, afternoon and dinner, confetti falls. Fill the board one day at a time.'),
+    step(3, 'Adding a stop', 'Press New under any day. Type the place name and pick it from the dropdown, or paste a Google Maps link. The name, address and pin fill in on their own. Choosing Lunch sets 12:00 and Dinner 17:30; change them any time. Notes, reservation and the rest are optional.'),
+    step(4, 'Getting between stops', 'Once two neighbouring stops have pins, the row between them shows how to get there automatically: a walk under 35 minutes, otherwise the subway under 45 minutes with the car time after it, otherwise a car. The subway time is always included. Tap the row to open directions in Google Maps.'),
+    el('div', { class: 'dlg-actions' }, el('button', { class: 'btn primary', onclick: () => { LS.set(TUTORIAL_LS, '1'); d.close(); } }, "Let's plan")),
+  ]);
+  d.addEventListener('close', () => LS.set(TUTORIAL_LS, '1'), { once: true });
+}
 function newTripDialog() {
   const prev = trip();
   const name = el('input', { placeholder: 'e.g. London, Tokyo & Bangkok' });
@@ -1678,6 +1749,7 @@ async function boot() {
       const last = LS.get('bookshelf-of-memories/last-trip');
       const pick = S.trips[last] ? last : (Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt)[0] || {}).id || null;
       selectTrip(pick);
+      if (!LS.get(TUTORIAL_LS)) setTimeout(tutorialDialog, 600);
     } else if (S.tripId && !S.trips[S.tripId]) {
       const nxt = Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt)[0];
       selectTrip(nxt ? nxt.id : null);

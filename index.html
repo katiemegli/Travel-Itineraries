@@ -573,8 +573,16 @@ class DbStore {
 }
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
+const QUEUE_LS = 'bookshelf-of-memories/unsent';
 class ScriptStore {
-  constructor(url) { this.url = url; this.data = { trips: {}, events: {} }; this.v = 0; this.tripCb = null; this.evCb = null; this.evTrip = null; this.timer = 0; }
+  /* Every write also goes to this device, and a write the shared board refuses is kept and
+     tried again, so a helper that is briefly unhappy never costs anybody their work. */
+  constructor(url, mirror) {
+    this.url = url; this.mirror = mirror || null; this.data = { trips: {}, events: {} }; this.v = 0;
+    this.tripCb = null; this.evCb = null; this.evTrip = null; this.timer = 0;
+    this.queue = []; this.retry = 0; this.hint = '';
+    try { this.queue = JSON.parse(LS.get(QUEUE_LS)) || []; } catch { this.queue = []; }
+  }
   async fetchAll() {
     const q = this.url + (this.url.includes('?') ? '&' : '?') + 'op=all&_=' + Date.now();
     try { const r = await fetch(q, { cache: 'no-store' }); if (r.ok) return await r.json(); } catch (e) { console.warn('store via fetch failed', e); }
@@ -584,6 +592,7 @@ class ScriptStore {
     const j = await Promise.race([this.fetchAll(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))]);
     if (!j || typeof j.v !== 'number') throw new Error('not a store');
     this.apply(j);
+    if (this.queue.length) this.flushQueue();
     this.timer = setInterval(() => this.poll(), 10000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.poll(); });
     window.addEventListener('focus', () => this.poll());
@@ -595,18 +604,47 @@ class ScriptStore {
     try { const j = await this.fetchAll(); if (j && typeof j.v === 'number' && j.v !== this.v) { this.apply(j); this.emit(); } } catch (e) { console.warn(e); }
   }
   emit() { this.tripCb && this.tripCb(Object.values(this.data.trips)); this.evCb && this.evCb(Object.values(this.data.events[this.evTrip] || {})); }
-  async send(body) {
+  async raw(body) {
     const r = await fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' });
-    if (!r.ok) throw { code: 'unavailable', message: 'store answered ' + r.status };
-    const j = await r.json(); if (!j.ok) throw { code: 'unavailable', message: j.error || 'store refused' };
-    this.v = j.v;
+    const text = await r.text();
+    if (!r.ok) { this.hint = 'The shared board answered ' + r.status + '.'; throw new Error(this.hint); }
+    let j = null; try { j = JSON.parse(text); } catch { this.hint = this.readHint(text); throw new Error(this.hint); }
+    if (!j.ok) { this.hint = j.error || 'The shared board refused the change.'; throw new Error(this.hint); }
+    this.hint = ''; this.v = j.v;
+  }
+  /* A helper set to "Anyone with Google account" answers a sign-in page instead of JSON. */
+  readHint(text) {
+    return /<html|accounts\.google|sign in/i.test(String(text))
+      ? 'The shared board is asking visitors to sign in. In Apps Script, set the deployment\'s "Who has access" to Anyone.'
+      : 'The shared board answered with something unexpected.';
+  }
+  async send(body) {
+    try { await this.raw(body); }
+    catch (e) {
+      console.warn('shared write failed', e);
+      this.queue.push(body); this.saveQueue(); this.startRetry();
+      throw { code: 'unavailable', message: (this.hint || 'Could not reach the shared board.') + ' Your change is safe on this device and will be sent when it comes back.' };
+    }
+  }
+  saveQueue() { LS.set(QUEUE_LS, JSON.stringify(this.queue.slice(-300))); }
+  startRetry() { if (!this.retry) this.retry = setInterval(() => this.flushQueue(), 15000); }
+  async flushQueue() {
+    if (!this.queue.length) { clearInterval(this.retry); this.retry = 0; return; }
+    while (this.queue.length) {
+      try { await this.raw(this.queue[0]); this.queue.shift(); this.saveQueue(); }
+      catch { return; } // still unhappy: keep everything and wait for the next go
+    }
+    clearInterval(this.retry); this.retry = 0;
+    if (S.lastError) { S.lastError = null; setStatus(); }
+    this.poll();
   }
   watchTrips(cb) { this.tripCb = cb; cb(Object.values(this.data.trips)); return () => { this.tripCb = null; }; }
   watchEvents(tripId, cb) { this.evCb = cb; this.evTrip = tripId; cb(Object.values(this.data.events[tripId] || {})); return () => { this.evCb = null; }; }
-  saveTrip(t) { this.data.trips[t.id] = t; return this.send({ op: 'set', kind: 'trip', id: t.id, data: t }); }
-  deleteTrip(id) { delete this.data.trips[id]; delete this.data.events[id]; return this.send({ op: 'deleteTrip', id }); }
-  saveEvent(tripId, ev) { (this.data.events[tripId] ||= {})[ev.id] = ev; return this.send({ op: 'set', kind: 'event', tripId, id: ev.id, data: ev }); }
-  deleteEvent(tripId, id) { delete (this.data.events[tripId] || {})[id]; return this.send({ op: 'delete', kind: 'event', tripId, id }); }
+  keep(fn) { if (this.mirror) Promise.resolve(fn()).catch(e => console.warn('device copy', e)); }
+  saveTrip(t) { this.data.trips[t.id] = t; this.keep(() => this.mirror.saveTrip(t)); return this.send({ op: 'set', kind: 'trip', id: t.id, data: t }); }
+  deleteTrip(id) { delete this.data.trips[id]; delete this.data.events[id]; this.keep(() => this.mirror.deleteTrip(id)); return this.send({ op: 'deleteTrip', id }); }
+  saveEvent(tripId, ev) { (this.data.events[tripId] ||= {})[ev.id] = ev; this.keep(() => this.mirror.saveEvent(tripId, ev)); return this.send({ op: 'set', kind: 'event', tripId, id: ev.id, data: ev }); }
+  deleteEvent(tripId, id) { delete (this.data.events[tripId] || {})[id]; this.keep(() => this.mirror.deleteEvent(tripId, id)); return this.send({ op: 'delete', kind: 'event', tripId, id }); }
   /* First time the shared store is empty, move what this device already has into it. */
   async adopt(local) {
     const writes = [];
@@ -800,7 +838,8 @@ async function track(p) {
   try { await p; }
   catch (e) {
     console.error(e);
-    S.lastError = e && e.code === 'quota_exceeded' ? 'Storage full – delete some cards' : 'Could not save – check your connection';
+    S.lastError = e && e.code === 'quota_exceeded' ? 'Storage full – delete some cards'
+      : (e && e.message) || 'Could not save – check your connection';
   }
   finally { S.savingCount--; setStatus(); }
 }
@@ -2054,11 +2093,15 @@ async function boot() {
   else {
     const local = new LocalStore();
     let shared = null;
-    if (DEFAULT_RESOLVER_URL) { try { shared = await new ScriptStore(DEFAULT_RESOLVER_URL).init(); } catch (e) { console.warn('shared store unavailable', e); } }
+    if (DEFAULT_RESOLVER_URL) { try { shared = await new ScriptStore(DEFAULT_RESOLVER_URL, local).init(); } catch (e) { console.warn('shared store unavailable', e); } }
     if (shared) {
       const remoteEmpty = !Object.keys(shared.data.trips).length, localHas = Object.keys(local.data.trips).length > 0;
-      if (remoteEmpty && localHas) { try { await shared.adopt(local.data); } catch (e) { console.warn(e); } }
-      S.store = shared; S.backend = 'shared';
+      let handedOver = true;
+      if (remoteEmpty && localHas) { try { await shared.adopt(local.data); } catch (e) { console.warn(e); handedOver = false; } }
+      if (handedOver) { S.store = shared; S.backend = 'shared'; }
+      // The shared board is there but would not take this device's trip. Keep showing the real
+      // board from this device rather than an empty shared one, and try again in the background.
+      else { S.store = local; S.backend = 'local'; S.offline = true; retryShared(local); }
     } else {
       S.store = local; S.backend = 'local'; S.lastError = ''; S.offline = true;
       retryShared(local); // keep trying, so this visitor joins the shared board as soon as it answers
@@ -2073,7 +2116,7 @@ async function boot() {
     S.trips = next;
     if (first) {
       first = false; S.ready = true;
-      if (!list.length && S.backend === 'local') {
+      if (!list.length) {
         const { trip: t, events } = sampleTrip();
         S.trips[t.id] = t; track(S.store.saveTrip(t)); for (const e of events) track(S.store.saveEvent(t.id, e));
       }
@@ -2100,7 +2143,7 @@ function retryShared(local) {
   S.sharedRetry = setInterval(async () => {
     if (S.backend === 'shared') { clearInterval(S.sharedRetry); S.sharedRetry = 0; return; }
     let shared = null;
-    try { shared = await new ScriptStore(DEFAULT_RESOLVER_URL).init(); } catch (e) { return; }
+    try { shared = await new ScriptStore(DEFAULT_RESOLVER_URL, local).init(); } catch (e) { return; }
     clearInterval(S.sharedRetry); S.sharedRetry = 0;
     try { await shared.merge(local.data); } catch (e) { console.warn(e); }
     S.unsubTrips && S.unsubTrips(); S.unsubEvents && S.unsubEvents(); S.unsubEvents = null;

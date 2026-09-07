@@ -574,7 +574,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.5'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.6'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -1321,6 +1321,17 @@ function renderTop() {
 const CHECKLIST = [['lunch', 'Lunch'], ['activity', 'Afternoon'], ['dinner', 'Dinner']];
 const planDaysOf = t => t.days.length > 2 ? t.days.slice(1, -1) : t.days; // the first and last days are travel days
 const hasCat = (id, d) => Object.values(S.events).some(e => !e.archived && e.category === id && e.date === d);
+/* A day that ends one stay and starts the next: lunch is the last meal in the city being left,
+   dinner the first in the one being arrived at, and the afternoon belongs to the journey. */
+const travelDay = (t, d) => staysOn(t, d).length > 1;
+const checkDone = (t, id, d) => hasCat(id, d) || (id === 'activity' && travelDay(t, d));
+const checkCity = (t, id, d) => {
+  const on = staysOn(t, d);
+  if (on.length < 2) return on.map(x => x.city).join(' → ');
+  if (id === 'lunch') return on[0].city;
+  if (id === 'dinner') return on[on.length - 1].city;
+  return on.map(x => x.city).join(' → ');
+};
 function renderChecklist(t) {
   const box = el('section', { class: 'checklist', 'aria-label': 'Planner checklist' },
     el('div', { class: 'label rule' }, 'Planner checklist'));
@@ -1328,18 +1339,18 @@ function renderChecklist(t) {
   const days = planDaysOf(t);
   for (const [id, name] of CHECKLIST) {
     const cat = catOf(id) || { name };
-    const missing = days.filter(d => !hasCat(id, d)).length;
+    const missing = days.filter(d => !checkDone(t, id, d)).length;
     const col = el('div', { class: 'check-col' },
       el('div', { class: 'check-head' },
         el('h3', { class: 'check-title' }, cat.name),
         el('span', { class: 'check-count' }, `${missing} day${missing === 1 ? '' : 's'}`)),
       el('ul', { class: 'check-list' }, days.map(d => {
-        const done = hasCat(id, d);
+        const done = checkDone(t, id, d);
         const label = fmtDate(d, { month: 'short', day: 'numeric' }) + ' / ' + parseDate(d).toLocaleDateString(undefined, { weekday: 'short' });
         const row = el(done ? 'div' : 'button', { class: 'check-day' + (done ? ' done' : ''), ...(done ? {} : { onclick: () => addCardDialog(d, id), title: `Add ${cat.name.toLowerCase()} on ${fmtDate(d)}` }) },
           el('span', { class: 'check-box', role: 'checkbox', 'aria-checked': String(done), 'aria-label': `${cat.name} on ${label}` }, done ? icon('tick') : null),
           el('span', { class: 'check-date' }, label),
-          el('span', { class: 'check-city' }, staysOn(t, d).map(x => x.city).join(' → ')));
+          el('span', { class: 'check-city' }, checkCity(t, id, d)));
         return el('li', {}, row);
       })));
     grid.append(col);
@@ -1351,7 +1362,7 @@ function renderChecklist(t) {
 /* Confetti the first time a day has lunch, afternoon and dinner. Days already complete when the board opens don't fire. */
 S.celebrated = null;
 function celebrateCompleteDays(t, days) {
-  const complete = new Set(days.filter(d => CHECKLIST.every(([id]) => hasCat(id, d))));
+  const complete = new Set(days.filter(d => CHECKLIST.every(([id]) => checkDone(t, id, d))));
   if (S.celebrated === null || S.celebrated.trip !== t.id) { S.celebrated = { trip: t.id, days: complete }; return; }
   const fresh = [...complete].filter(d => !S.celebrated.days.has(d));
   S.celebrated.days = complete;

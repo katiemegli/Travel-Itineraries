@@ -154,7 +154,7 @@ body[data-theme="undertone"] body,body[data-theme="undertone"]{background:#111}
 .hero-collapsed .top{position:sticky}
 .hero-drawer{display:grid;grid-template-rows:1fr;width:100%;transition:grid-template-rows .55s cubic-bezier(.4,0,.2,1),opacity .4s ease}
 .hero-body{overflow:hidden;min-height:0}
-.hero-pad{display:flex;flex-direction:column;align-items:center;position:relative;padding:96px 0 112px;padding-top:max(96px,calc(env(safe-area-inset-top) + 80px))}
+.hero-pad{display:flex;flex-direction:column;align-items:center;position:relative;padding:96px 0 72px;padding-top:max(96px,calc(env(safe-area-inset-top) + 80px))}
 .hero-collapsed .hero-drawer{grid-template-rows:0fr;opacity:0;pointer-events:none}
 .bar{display:flex;justify-content:center;align-items:center;gap:12px;width:100%;height:0;opacity:0;overflow:hidden;transition:height .55s cubic-bezier(.4,0,.2,1),opacity .35s ease;position:relative;z-index:2}
 .hero-collapsed .bar{height:58px;opacity:1}
@@ -455,13 +455,13 @@ dialog::backdrop{background:rgba(27,43,94,.4)}
 .check-city{font:300 13px/1.4 var(--mincho);color:var(--ink-60)}
 .check-done{font:300 13px/1.6 var(--mincho);color:var(--ink-60);padding:14px 0;background-image:none}
 /* scroll cue and the collapsed header bar (phones) */
-.scroll-cue{display:flex;position:absolute;bottom:28px;left:50%;transform:translateX(-50%);flex-direction:column;align-items:center;gap:8px;opacity:.5;color:var(--ink);font:400 9px/1 var(--sans);letter-spacing:.3em;text-transform:uppercase;animation:bounce 1s infinite;z-index:2;padding:8px;min-width:44px;min-height:44px}
+.scroll-cue{display:flex;position:relative;margin-top:36px;flex-direction:column;align-items:center;gap:8px;opacity:.5;color:var(--ink);font:400 9px/1 var(--sans);letter-spacing:.3em;text-transform:uppercase;animation:bounce 1s infinite;z-index:2;padding:8px;min-width:44px;min-height:44px}
 /* The tracked text carries an empty letter-space after the last character, inside its box.
    Centring the box therefore leaves the letters sitting left of the arrow; half that space,
    added as a left margin, puts the ink back over the centre. */
 .scroll-cue span{margin-left:.3em}
 .scroll-cue svg{width:14px;height:14px}
-@keyframes bounce{0%,100%{transform:translate(-50%,-25%);animation-timing-function:cubic-bezier(.8,0,1,1)}50%{transform:translate(-50%,0);animation-timing-function:cubic-bezier(0,0,.2,1)}}
+@keyframes bounce{0%,100%{transform:translateY(-25%);animation-timing-function:cubic-bezier(.8,0,1,1)}50%{transform:translateY(0);animation-timing-function:cubic-bezier(0,0,.2,1)}}
 .trip-name[role="button"]{cursor:pointer}
 /* ---------- phones ---------- */
 @media (max-width:760px){
@@ -470,7 +470,7 @@ dialog::backdrop{background:rgba(27,43,94,.4)}
   .checklist{margin-top:40px;padding:22px 20px 24px}
   .check-grid{grid-template-columns:1fr;gap:32px 0}
   .top{padding:0 var(--sp-md)}
-  .hero-pad{padding:88px 0 112px}
+  .hero-pad{padding:88px 0 64px}
   .top-row{padding:18px var(--sp-lg)}
   .top-actions .iconbtn{display:none}
   .status .txt{display:none}
@@ -676,7 +676,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.14'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.15'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

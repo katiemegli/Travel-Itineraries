@@ -143,11 +143,12 @@ body[data-theme="undertone"] .link .addtr,body[data-theme="undertone"] .link .ch
 body[data-theme="undertone"] .col:last-child{border-right:none}
 /* The tabs and everything below them ride on the design's half-opaque panel, blurred and
    lifted off the gradient, so the small type stays legible without flattening the colour. */
+/* One wash, not four. Each element that blurs its own backdrop can only sample within
+   itself, so neighbours meet at a visible edge; the gradient behind is smooth enough that
+   the blur was doing nothing anyway, and a plain half-opaque fill runs straight through. */
 body[data-theme="undertone"] .filters,body[data-theme="undertone"] .daynav,
 body[data-theme="undertone"] .main,body[data-theme="undertone"] .unsched-section{
   background:rgba(255,255,255,.15);
-  backdrop-filter:blur(40px) saturate(150%);
-  -webkit-backdrop-filter:blur(40px) saturate(150%);
 }
 body[data-theme="undertone"] .filters,body[data-theme="undertone"] .daynav{border-top:1px solid #000}
 body[data-theme="undertone"] .unsched-section{margin:0;padding-left:var(--sp-xl);padding-right:var(--sp-xl)}
@@ -681,7 +682,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.18'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.19'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

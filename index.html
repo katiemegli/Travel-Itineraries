@@ -130,7 +130,7 @@ a{color:inherit}
 .time{font:400 11px/1.4 var(--sans);letter-spacing:.1em;color:var(--ink-50)}
 .details{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .card-cat{align-self:flex-start;display:inline-flex;align-items:center;line-height:1;gap:8px;font:400 10px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-50);margin-bottom:4px;padding:0;background:none}
-.card-cat::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--cat,var(--sand));border:1px solid var(--ink-05);box-shadow:var(--shadow)}
+.card-cat::before{content:"";width:8px;height:8px;margin:0 4px;box-sizing:border-box;border-radius:50%;background:var(--cat,var(--sand));border:1px solid var(--ink-05);box-shadow:var(--shadow)}
 .card-cat i{display:none}
 .card-head{display:flex;align-items:center;gap:8px}
 .card-emoji{font-size:15px;line-height:1;flex:none;font-family:system-ui;transform:translateY(1px)}
@@ -167,6 +167,7 @@ a{color:inherit}
 .link .line{width:64px;flex:none;height:100%;min-height:20px;position:relative}
 .link .line::before{content:"";position:absolute;left:6px;top:0;bottom:0;border-left:1px dotted var(--ink-30)}
 .link .chip{background:none;padding:0;font:400 10px/1.6 var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-50);gap:8px}
+.chip .mi{display:inline-flex;width:16px;justify-content:center;flex:none;font-family:system-ui;font-size:13px;line-height:1}
 .link .chip[role="button"],.link a.chip{cursor:pointer;text-decoration:none}
 .link .chip[role="button"]:hover,.link a.chip:hover{color:var(--ink)}
 .link .addtr{color:var(--ink-40);font:300 12px/1.5 var(--mincho);opacity:1;padding:0;text-align:left}
@@ -1205,8 +1206,8 @@ function transportChip(tr, attrs = {}, tag = 'span') {
   if (tr.mins) parts.push(`${tr.est ? '~' : ''}${tr.mins} min`);
   if (m) parts.push(m.label);
   const alts = (tr.alts || (tr.alt ? [tr.alt] : [])).filter(x => x && MODES[x.mode]);
-  const alt = alts.flatMap(x => [' · ', el('span', { 'aria-hidden': 'true' }, MODES[x.mode].icon), ` ${x.mins} min ${MODES[x.mode].label}`]);
-  return el(tag, { class: 'chip' + (m ? ' tone' : '') + (tr.est ? ' est' : ''), style: m ? `--h:${m.h}` : '', ...attrs }, m && el('span', { 'aria-hidden': 'true' }, m.icon), parts.join(' '), ...alt);
+  const alt = alts.flatMap(x => [' · ', el('span', { class: 'mi', 'aria-hidden': 'true' }, MODES[x.mode].icon), ` ${x.mins} min ${MODES[x.mode].label}`]);
+  return el(tag, { class: 'chip' + (m ? ' tone' : '') + (tr.est ? ' est' : ''), style: m ? `--h:${m.h}` : '', ...attrs }, m && el('span', { class: 'mi', 'aria-hidden': 'true' }, m.icon), parts.join(' '), ...alt);
 }
 function renderCard(ev) {
   const t = trip();

@@ -395,6 +395,33 @@ dialog.tut-dlg .dlg::-webkit-scrollbar{display:none}
 .tut-dont input:checked{background:var(--ink);border-color:var(--ink)}
 @media (max-width:760px){.tut{min-height:0}.tut-title{font-size:30px}.tut-title.big{font-size:48px}.pola img{height:170px}dialog.tut-dlg .dlg{padding:22px 20px 18px}.tut-body{font-size:14px}}
 
+/* ---------- a card's three tabs: details, images, links ---------- */
+.ed-tabs{display:flex;gap:var(--sp-lg);border-bottom:1px solid var(--ink-10);margin:0 0 var(--sp-sm);font:400 11px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase}
+.ed-tabs button{padding:12px 2px;color:var(--ink-50);border-bottom:2px solid transparent;transition:color .2s,border-color .2s;min-height:44px}
+.ed-tabs button:hover{color:var(--ink)}
+.ed-tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.ed-tabs .n{opacity:.45;margin-left:6px}
+.img-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:var(--sp-md) 0}
+.img-cell{position:relative;aspect-ratio:1;overflow:hidden;border:1px solid var(--ink-10);background:var(--panel-2)}
+.img-cell img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.img-del{position:absolute;top:4px;right:4px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:var(--paper);border:1px solid var(--ink-20);color:var(--ink);opacity:0;transition:opacity .2s}
+.img-cell:hover .img-del,.img-del:focus-visible{opacity:1}
+.img-del svg{width:12px;height:12px}
+.img-drop{display:flex;flex-direction:column;align-items:center;gap:12px;padding:26px 20px;border:1px dashed var(--ink-20);text-align:center;transition:border-color .2s,background .2s}
+.img-drop.over{border-color:var(--ink);background:var(--panel-2)}
+.img-note{color:var(--ink-60);font:300 12px/1.7 var(--mincho);margin-top:var(--sp-md)}
+.lightbox{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:24px;cursor:zoom-out}
+.lightbox img{max-width:100%;max-height:100%;object-fit:contain;box-shadow:var(--shadow-lg)}
+.link-row{display:flex;align-items:center;gap:12px;padding:8px 0}
+.link-ico{width:28px;height:28px;flex:none;display:inline-flex;align-items:center;justify-content:center;color:var(--ink-30);transition:color .2s}
+.link-ico.on{color:var(--ink)}
+.link-ico svg{width:19px;height:19px}
+.link-open{width:40px;height:40px;flex:none;display:inline-flex;align-items:center;justify-content:center;color:var(--ink-40);border:1px solid transparent;transition:color .2s,border-color .2s}
+.link-open:hover{color:var(--ink);border-color:var(--ink-20)}
+.link-open svg{width:14px;height:14px}
+.link-open[hidden]{display:none}
+@media (max-width:760px){.img-grid{gap:6px}.ed-tabs{gap:var(--sp-md);letter-spacing:.12em}}
+
 /* ---------- popover / dialogs ---------- */
 .pop{position:fixed;z-index:50;background:var(--paper);border:1px solid var(--ink-20);box-shadow:var(--shadow-lg);padding:6px 0;min-width:240px;max-width:min(320px,calc(100vw - 24px))}
 .pop button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:12px 16px;font:300 14px/1.4 var(--mincho);border-bottom:1px solid var(--ink-05)}
@@ -596,6 +623,13 @@ const ICONS = {
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
   archive: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v12h14V8M10 12h4"/></svg>',
+  image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 16l-5-5-6 6-2-2-5 5"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.3-2.3a4 4 0 1 0-5.7-5.7L11.6 6.7"/><path d="M13.5 10.5a4 4 0 0 0-5.7 0l-2.3 2.3a4 4 0 1 0 5.7 5.7l1.2-1.2"/></svg>',
+  tiktok: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.2 3h-2.5v11.4a2.6 2.6 0 1 1-2.1-2.6V9.3a5.1 5.1 0 1 0 4.6 5.1V8.8c1 .7 2.2 1.1 3.5 1.2V7.4c-1.7-.2-3.1-1.6-3.5-3.4z"/></svg>',
+  instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17" cy="7" r="1.2" fill="currentColor" stroke="none"/></svg>',
+  youtube: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10.4 9.3l5.2 2.7-5.2 2.7z" fill="currentColor" stroke="none"/></svg>',
+  xhs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="16" rx="3"/><path d="M12 16.6c-2.7-1.7-4.1-3.1-4.1-4.6a2.05 2.05 0 0 1 4.1-.6 2.05 2.05 0 0 1 4.1.6c0 1.5-1.4 2.9-4.1 4.6z" fill="currentColor" stroke="none"/></svg>',
+  reddit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="13.8" r="7.4"/><circle cx="17.8" cy="4.6" r="1.5"/><path d="M12 6.4l1.1-2.8 3 1.1"/><circle cx="9.4" cy="13.3" r="1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="13.3" r="1" fill="currentColor" stroke="none"/><path d="M9.5 16.6c1.5 1.1 3.5 1.1 5 0"/></svg>',
 };
 const icon = name => { const s = el('span'); s.innerHTML = ICONS[name]; return s.firstChild; };
 
@@ -682,7 +716,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.20'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.21'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -785,7 +819,7 @@ const S = {
   showArchived: false, catFilter: '',
   editingId: null, unsubEvents: null,
   savingCount: 0, lastError: null,
-  offline: false, sharedRetry: 0, unsubTrips: null, onTrips: null, onTripsError: null, updateReady: '',
+  offline: false, sharedRetry: 0, unsubTrips: null, onTrips: null, onTripsError: null, updateReady: '', edTab: 'details', imgNote: '',
   maps: { state: 'off', error: '', promise: null }, // off | loading | ready | failed
   osm: { state: 'unknown' }, // unknown | ok | blocked  (the hosted artifact blocks outside requests)
   autoBusy: false, autoAgain: false,
@@ -1020,6 +1054,7 @@ function normalizeEvent(ev, t) {
     const m = LEGACY_CAT[ev.category]; ev.category = typeof m === 'function' ? m(ev) : m;
   }
   ev.notes ||= {}; ev.transport ||= { mins: null, mode: '' }; ev.place ||= null; ev.auto ||= null;
+  ev.images ||= []; if (!Array.isArray(ev.links) || ev.links.length !== 3) ev.links = [0, 1, 2].map(i => (ev.links && ev.links[i]) || '');
   return ev;
 }
 
@@ -2084,6 +2119,7 @@ function releasePage() {
   window.scrollTo(0, y);
 }
 function openEditor(id, opts = {}) {
+  if (S.editingId !== id) { S.edTab = 'details'; S.imgNote = ''; } // a card always opens on its details
   S.editingId = id;
   holdPage();
   $('#editor').classList.add('open'); $('#backdrop').classList.add('open');
@@ -2100,6 +2136,113 @@ function closeEditor() {
   $('#editor').classList.remove('open'); $('#backdrop').classList.remove('open');
   $('#editor').replaceChildren();
   releasePage();
+}
+/* ================= a card's pictures ================= */
+/* The shared helper keeps each document in an Apps Script property, which holds only a few
+   kilobytes, so pictures cannot ride along inside a card there. While that store is in use they
+   are kept on the device instead; on every other store they travel with the card. */
+const IMG_LS = 'bookshelf-of-memories/images';
+const MAX_IMG_SIDE = 1400, IMG_QUALITY = 0.72, MAX_IMAGES = 24;
+const imagesTravel = () => S.backend !== 'shared';
+const readSidecar = () => { try { return JSON.parse(LS.get(IMG_LS)) || {}; } catch { return {}; } };
+const cardImages = ev => (ev.images && ev.images.length ? ev.images : (readSidecar()[ev.id] || []));
+function setCardImages(ev, list) {
+  if (imagesTravel()) { patchEvent(ev.id, { images: list }, { immediate: true }); renderEditor(); return; }
+  const all = readSidecar();
+  if (list.length) all[ev.id] = list; else delete all[ev.id];
+  LS.set(IMG_LS, JSON.stringify(all));
+  renderEditor(); renderAll();
+}
+/* Photographs come off a phone far larger than a card needs, so each one is redrawn to a
+   sensible size before it is kept. */
+function shrinkImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, MAX_IMG_SIDE / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale));
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); // a picture kept as a photograph has no transparency to fall back on
+      g.drawImage(img, 0, 0, w, h);
+      resolve({ id: uid(), name: file.name || 'photo', w, h, at: Date.now(), data: c.toDataURL('image/jpeg', IMG_QUALITY) });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('not a picture')); };
+    img.src = url;
+  });
+}
+/* The note lives on the state rather than in the panel, because adding a picture rebuilds
+   the panel and a message written to the old one would go with it. */
+async function addImages(ev, files) {
+  const all = [...files];
+  const pics = all.filter(f => f.type.startsWith('image/'));
+  const skipped = all.length - pics.length;
+  const have = cardImages(ev);
+  const room = Math.max(0, MAX_IMAGES - have.length);
+  const over = Math.max(0, pics.length - room);
+  const added = [];
+  for (const f of pics.slice(0, room)) { try { added.push(await shrinkImage(f)); } catch (e) { console.warn(e); } }
+  S.imgNote = [skipped && 'Only pictures can go here.', over && `A card holds ${MAX_IMAGES} pictures.`].filter(Boolean).join(' ');
+  if (added.length) setCardImages(ev, [...have, ...added]); else renderEditor();
+}
+function lightbox(im) {
+  const box = el('div', { class: 'lightbox', onclick: () => box.remove() }, el('img', { src: im.data, alt: im.name }));
+  document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { box.remove(); document.removeEventListener('keydown', esc); } });
+  document.body.append(box);
+}
+function imagesPanel(ev) {
+  const note = el('div', { class: 'img-note' },
+    [S.imgNote, imagesTravel() ? '' : 'Pictures stay on this device: the shared helper cannot carry files yet.'].filter(Boolean).join(' '));
+  const pics = cardImages(ev);
+  const grid = el('div', { class: 'img-grid' }, pics.map(im => el('div', { class: 'img-cell' },
+    el('img', { src: im.data, alt: im.name, loading: 'lazy', onclick: () => lightbox(im) }),
+    el('button', { class: 'img-del', 'aria-label': `Remove ${im.name}`, onclick: () => setCardImages(ev, cardImages(ev).filter(x => x.id !== im.id)) }, icon('x')))));
+  const file = el('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true,
+    onchange: e => { addImages(ev, e.target.files); e.target.value = ''; } });
+  const drop = el('div', { class: 'img-drop',
+    ondragover: e => { e.preventDefault(); drop.classList.add('over'); },
+    ondragleave: () => drop.classList.remove('over'),
+    ondrop: e => { e.preventDefault(); drop.classList.remove('over'); addImages(ev, e.dataTransfer.files); } },
+    el('button', { class: 'btn', onclick: () => file.click() }, icon('image'), 'Add pictures'),
+    el('span', { class: 'hint' }, 'or drop them here'));
+  return el('div', {}, pics.length ? grid : null, drop, file, note);
+}
+
+/* ================= a card's links ================= */
+const LINK_KINDS = [
+  { icon: 'tiktok',    label: 'TikTok',       host: /(^|\.)tiktok\.com$/i },
+  { icon: 'instagram', label: 'Instagram',    host: /(^|\.)(instagram\.com|instagr\.am)$/i },
+  { icon: 'youtube',   label: 'YouTube',      host: /(^|\.)(youtube\.com|youtu\.be)$/i },
+  { icon: 'xhs',       label: 'Xiaohongshu',  host: /(^|\.)(xiaohongshu\.com|xhslink\.com)$/i },
+  { icon: 'reddit',    label: 'Reddit',       host: /(^|\.)(reddit\.com|redd\.it)$/i },
+];
+const linkHref = url => (/^https?:\/\//i.test(url) ? url : 'https://' + url);
+function linkKind(url) {
+  const v = String(url || '').trim(); if (!v) return null;
+  try { const host = new URL(linkHref(v)).hostname; return LINK_KINDS.find(k => k.host.test(host)) || { icon: 'link', label: 'Link' }; }
+  catch { return null; }
+}
+function linksPanel(ev) {
+  const rows = [0, 1, 2].map(i => {
+    const url = (ev.links && ev.links[i]) || '';
+    const ico = el('span', { class: 'link-ico' }, icon('link'));
+    const open = el('a', { class: 'link-open', target: '_blank', rel: 'noopener', 'aria-label': 'Open in a new tab', title: 'Open in a new tab' }, icon('arrow'));
+    const paint = v => {
+      const kind = linkKind(v);
+      ico.replaceChildren(icon(kind ? kind.icon : 'link'));
+      ico.classList.toggle('on', !!kind);
+      ico.title = kind ? kind.label : '';
+      open.hidden = !kind;
+      if (kind) open.href = linkHref(v.trim());
+    };
+    const inp = el('input', { type: 'url', inputmode: 'url', value: url, placeholder: 'Paste a link',
+      oninput: e => { paint(e.target.value); patchEvent(ev.id, { links: [0, 1, 2].map(j => j === i ? e.target.value.trim() : ((S.events[ev.id].links || [])[j] || '')) }); },
+      onblur: () => flushEvent(ev.id) });
+    paint(url);
+    return el('div', { class: 'link-row' }, ico, inp, open);
+  });
+  return el('div', {}, ...rows, el('div', { class: 'img-note' }, 'TikTok, Instagram, YouTube, Xiaohongshu and Reddit are recognised by name; anything else keeps the plain link mark. A link opens in a new tab.'));
 }
 function refreshEditor() {
   if (!S.editingId) return;
@@ -2183,25 +2326,36 @@ function renderEditor() {
 
   const dayName = ev.date && t.days.includes(ev.date) ? `${weekday(ev.date)}, ${fmtDate(ev.date)}` : (ev.date ? 'Not one of this trip\'s days' : 'Unscheduled');
 
+  // Everything the card already held lives under Details; pictures and links get a tab each.
+  const details = [
+    prop('pin', 'Place', el('div', { id: 'f-place' }, pf), openLink),
+    prop('tag', 'Category', catSeg),
+    prop('cal', 'Date', date),
+    prop('clock', 'Time', time),
+    ...noteRows,
+    prop('book', 'Reservation', resv),
+    prop('route', 'Transportation', autoLine, el('div', { class: 'section-h' }, 'Override by hand'), el('div', { class: 'row', style: 'margin-top:6px' }, mins, mode), clearManual),
+    prop('star', 'Rating', rating),
+    prop('archive', 'Archive', archive),
+    prop('shirt', 'Outfit', outfit),
+    el('div', { class: 'ed-foot' },
+      el('button', { class: 'btn', onclick: () => duplicateEvent(ev.id) }, icon('copy'), 'Duplicate'),
+      el('button', { class: 'btn danger', style: 'margin-left:auto', onclick: () => { if (confirm(`Delete “${ev.title || 'Untitled'}”?`)) deleteEvent(ev.id); } }, icon('trash'), 'Delete')),
+  ];
+  const tab = S.edTab || 'details';
+  const counts = { details: 0, images: cardImages(ev).length, links: (ev.links || []).filter(Boolean).length };
+  const tabs = el('div', { class: 'ed-tabs', role: 'tablist' },
+    [['details', 'Details'], ['images', 'Images'], ['links', 'Links']].map(([id, label]) =>
+      el('button', { role: 'tab', 'aria-selected': String(tab === id), onclick: () => { S.edTab = id; S.imgNote = ''; renderEditor(); } },
+        label, counts[id] ? el('span', { class: 'n' }, counts[id]) : null)));
   ed.append(
     el('div', { class: 'ed-top' },
       el('span', { class: 'day', style: 'padding-left:8px' }, (S.draftId === ev.id ? 'New card · ' : '') + dayName),
       el('button', { class: 'iconbtn', 'aria-label': 'Close', onclick: closeEditor }, icon('x'))),
     el('div', { class: 'ed-scroll' },
       el('div', { class: 'ed-hero' }, emojiBtn, title),
-      prop('pin', 'Place', el('div', { id: 'f-place' }, pf), openLink),
-      prop('tag', 'Category', catSeg),
-      prop('cal', 'Date', date),
-      prop('clock', 'Time', time),
-      ...noteRows,
-      prop('book', 'Reservation', resv),
-      prop('route', 'Transportation', autoLine, el('div', { class: 'section-h' }, 'Override by hand'), el('div', { class: 'row', style: 'margin-top:6px' }, mins, mode), clearManual),
-      prop('star', 'Rating', rating),
-      prop('archive', 'Archive', archive),
-      prop('shirt', 'Outfit', outfit),
-      el('div', { class: 'ed-foot' },
-        el('button', { class: 'btn', onclick: () => duplicateEvent(ev.id) }, icon('copy'), 'Duplicate'),
-        el('button', { class: 'btn danger', style: 'margin-left:auto', onclick: () => { if (confirm(`Delete “${ev.title || 'Untitled'}”?`)) deleteEvent(ev.id); } }, icon('trash'), 'Delete'))));
+      tabs,
+      ...(tab === 'images' ? [imagesPanel(ev)] : tab === 'links' ? [linksPanel(ev)] : details)));
   $('.ed-scroll', ed).scrollTop = scrollTop;
 }
 function emojiPicker(anchor, id) {

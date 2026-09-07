@@ -412,6 +412,9 @@ dialog.tut-dlg .dlg::-webkit-scrollbar{display:none}
 .img-del{position:absolute;top:4px;right:4px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:var(--paper);border:1px solid var(--ink-20);color:var(--ink);opacity:0;transition:opacity .2s}
 .img-cell:hover .img-del,.img-del:focus-visible{opacity:1}
 .img-del svg{width:12px;height:12px}
+.img-tag{position:absolute;left:0;bottom:0;padding:3px 6px;background:var(--paper);color:var(--ink-60);font:400 9px/1 var(--sans);letter-spacing:.15em;text-transform:uppercase}
+.img-cell.broken{background:repeating-linear-gradient(45deg,var(--ink-05),var(--ink-05) 6px,transparent 6px,transparent 12px)}
+.img-cell.broken img{opacity:0}
 .img-drop{display:flex;flex-direction:column;align-items:center;gap:12px;padding:26px 20px;border:1px dashed var(--ink-20);text-align:center;transition:border-color .2s,background .2s}
 .img-drop.over{border-color:var(--ink);background:var(--panel-2)}
 .img-note{color:var(--ink-60);font:300 12px/1.7 var(--mincho);margin-top:var(--sp-md)}
@@ -723,7 +726,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.29'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.30'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -2163,9 +2166,20 @@ function closeEditor() {
    stays on this device and the panel says so. */
 const IMG_LS = 'bookshelf-of-memories/images';
 const MAX_IMG_SIDE = 1400, IMG_QUALITY = 0.72, MAX_IMAGES = 24;
-const driveUrl = (fileId, w) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${w}`;
-const imgSrc = im => im.fileId ? driveUrl(im.fileId, 800) : im.data;
-const imgFull = im => im.fileId ? driveUrl(im.fileId, 2000) : im.data;
+/* Drive serves a shared picture from several addresses, and which one answers has varied over
+   the years, so a picture tries them in turn until one loads. */
+const driveUrls = (fileId, w) => { const id = encodeURIComponent(fileId); return [
+  `https://drive.google.com/thumbnail?id=${id}&sz=w${w}`,
+  `https://lh3.googleusercontent.com/d/${id}=w${w}`,
+  `https://drive.google.com/uc?export=view&id=${id}`,
+]; };
+const imgSrc = im => im.fileId ? driveUrls(im.fileId, 800)[0] : im.data;
+const imgFull = im => im.fileId ? driveUrls(im.fileId, 2000)[0] : im.data;
+function fallbackOnError(img, im, w) {
+  if (!im.fileId) return;
+  const urls = driveUrls(im.fileId, w); let i = 0;
+  img.addEventListener('error', () => { i += 1; if (i < urls.length) img.src = urls[i]; else img.closest('.img-cell, .lightbox')?.classList.add('broken'); });
+}
 const viaDrive = () => S.backend === 'shared' && S.store && typeof S.store.putImage === 'function';
 const readSidecar = () => { try { return JSON.parse(LS.get(IMG_LS)) || {}; } catch { return {}; } };
 const writeSidecar = all => LS.set(IMG_LS, JSON.stringify(all));
@@ -2224,16 +2238,21 @@ async function addImages(ev, files) {
   renderEditor(); renderAll();
 }
 function lightbox(im) {
-  const box = el('div', { class: 'lightbox', onclick: () => box.remove() }, el('img', { src: imgFull(im), alt: im.name }));
+  const big = el('img', { src: imgFull(im), alt: im.name, referrerpolicy: 'no-referrer' }); fallbackOnError(big, im, 2000);
+  const box = el('div', { class: 'lightbox', onclick: () => box.remove() }, big);
   document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { box.remove(); document.removeEventListener('keydown', esc); } });
   document.body.append(box);
 }
 function imagesPanel(ev) {
   const note = S.imgNote ? el('div', { class: 'img-note' }, S.imgNote) : null;
   const pics = cardImages(ev);
-  const grid = el('div', { class: 'img-grid' }, pics.map(im => el('div', { class: 'img-cell' },
-    el('img', { src: imgSrc(im), alt: im.name, loading: 'lazy', referrerpolicy: 'no-referrer', onclick: () => lightbox(im) }),
-    el('button', { class: 'img-del', 'aria-label': `Remove ${im.name}`, onclick: () => removeImage(ev, im) }, icon('x')))));
+  const grid = el('div', { class: 'img-grid' }, pics.map(im => {
+    const img = el('img', { src: imgSrc(im), alt: im.name, loading: 'lazy', referrerpolicy: 'no-referrer', onclick: () => lightbox(im) });
+    fallbackOnError(img, im, 800);
+    return el('div', { class: 'img-cell' + (im.local ? ' local' : ''), title: im.local ? 'Only on this device' : (im.fileId ? 'Shared through Drive' : '') }, img,
+      im.local ? el('span', { class: 'img-tag' }, 'This device') : null,
+      el('button', { class: 'img-del', 'aria-label': `Remove ${im.name}`, onclick: () => removeImage(ev, im) }, icon('x')));
+  }));
   const file = el('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true,
     onchange: e => { addImages(ev, e.target.files); e.target.value = ''; } });
   const drop = el('div', { class: 'img-drop',

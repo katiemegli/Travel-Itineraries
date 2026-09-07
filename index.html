@@ -451,6 +451,10 @@ dialog::backdrop{background:rgba(27,43,94,.4)}
 .check-done{font:300 13px/1.6 var(--mincho);color:var(--ink-60);padding:14px 0;background-image:none}
 /* scroll cue and the collapsed header bar (phones) */
 .scroll-cue{display:flex;position:absolute;bottom:28px;left:50%;transform:translateX(-50%);flex-direction:column;align-items:center;gap:8px;opacity:.5;color:var(--ink);font:400 9px/1 var(--sans);letter-spacing:.3em;text-transform:uppercase;animation:bounce 1s infinite;z-index:2;padding:8px;min-width:44px;min-height:44px}
+/* The tracked text carries an empty letter-space after the last character, inside its box.
+   Centring the box therefore leaves the letters sitting left of the arrow; half that space,
+   added as a left margin, puts the ink back over the centre. */
+.scroll-cue span{margin-left:.3em}
 .scroll-cue svg{width:14px;height:14px}
 @keyframes bounce{0%,100%{transform:translate(-50%,-25%);animation-timing-function:cubic-bezier(.8,0,1,1)}50%{transform:translate(-50%,0);animation-timing-function:cubic-bezier(0,0,.2,1)}}
 .trip-name[role="button"]{cursor:pointer}
@@ -667,7 +671,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.10'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.11'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

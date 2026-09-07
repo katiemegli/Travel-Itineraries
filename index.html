@@ -1042,7 +1042,8 @@ function renderChecklist(t) {
   const grid = el('div', { class: 'check-grid' });
   for (const [id, name] of CHECKLIST) {
     const cat = catOf(id) || { name };
-    const missing = t.days.filter(d => !Object.values(S.events).some(e => !e.archived && e.category === id && e.date === d));
+    const planDays = t.days.length > 2 ? t.days.slice(1, -1) : t.days; // the first and last days are travel days
+    const missing = planDays.filter(d => !Object.values(S.events).some(e => !e.archived && e.category === id && e.date === d));
     const col = el('div', { class: 'check-col' },
       el('div', { class: 'check-head' },
         el('div', {}, el('h3', { class: 'check-title' }, cat.name), el('p', { class: 'check-sub' }, missing.length ? 'Still to plan' : 'All planned')),

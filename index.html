@@ -307,7 +307,7 @@ body[data-theme="undertone"] body,body[data-theme="undertone"]{background:#111}
 .backdrop.open{display:block}
 .ed-top{display:flex;align-items:center;justify-content:space-between;padding:var(--sp-lg) var(--sp-lg) 0 var(--sp-xl);flex:none}
 .ed-top .day{font:400 10px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-50)}
-.ed-scroll{flex:1;min-height:0;overflow-y:auto;padding:var(--sp-sm) var(--sp-xl) var(--sp-xl);scrollbar-width:none}
+.ed-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:var(--sp-sm) var(--sp-xl) var(--sp-xl);scrollbar-width:none}
 .ed-scroll::-webkit-scrollbar{display:none}
 .ed-hero{display:flex;gap:var(--sp-md);align-items:center;margin:var(--sp-md) 0 var(--sp-lg);padding-bottom:var(--sp-md);border-bottom:1px solid var(--ink-20)}
 .emoji-btn{width:48px;height:48px;border:1px solid var(--ink-20);font-size:24px;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex:none;background:rgba(255,255,255,.4);font-family:system-ui}
@@ -406,7 +406,7 @@ dialog.tut-dlg .dlg::-webkit-scrollbar{display:none}
 .pop .lbl{font:400 10px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-50);padding:12px 16px 6px}
 dialog{background:var(--paper);color:var(--ink);border:1px solid var(--ink-10);border-radius:0;padding:0;width:min(600px,calc(100vw - 24px));box-shadow:var(--shadow-lg);max-height:calc(100dvh - 40px)}
 dialog::backdrop{background:rgba(27,43,94,.4)}
-.dlg{padding:var(--sp-xl);display:flex;flex-direction:column;gap:var(--sp-md);max-height:calc(100dvh - 40px);overflow-y:auto}
+.dlg{padding:var(--sp-xl);display:flex;flex-direction:column;gap:var(--sp-md);max-height:calc(100dvh - 40px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
 .dlg h2{font:300 italic 44px/1 var(--script);margin:0}
 .dlg p{margin:0;color:var(--ink-60);font:300 13px/1.7 var(--mincho)}
 .field{display:flex;flex-direction:column;gap:8px;padding-top:8px}
@@ -682,7 +682,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.19'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.20'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -2067,8 +2067,25 @@ function addCardDialog(date, category) {
 
 /* ================= editor ================= */
 let editorRendered = '';
+/* A phone hands a touch inside a fixed panel to the page underneath, which leaves the card
+   looking stuck. Holding the page still while a card is open gives the sheet its own scroll. */
+let pageHeld = null;
+function holdPage() {
+  if (pageHeld !== null || !isPhone()) return;
+  pageHeld = window.scrollY;
+  const b = document.body.style;
+  b.position = 'fixed'; b.top = -pageHeld + 'px'; b.left = '0'; b.right = '0'; b.width = '100%';
+}
+function releasePage() {
+  if (pageHeld === null) return;
+  const b = document.body.style;
+  b.position = ''; b.top = ''; b.left = ''; b.right = ''; b.width = '';
+  const y = pageHeld; pageHeld = null;
+  window.scrollTo(0, y);
+}
 function openEditor(id, opts = {}) {
   S.editingId = id;
+  holdPage();
   $('#editor').classList.add('open'); $('#backdrop').classList.add('open');
   renderEditor();
   const ed = $('#editor');
@@ -2082,6 +2099,7 @@ function closeEditor() {
   S.editingId = null; editorRendered = '';
   $('#editor').classList.remove('open'); $('#backdrop').classList.remove('open');
   $('#editor').replaceChildren();
+  releasePage();
 }
 function refreshEditor() {
   if (!S.editingId) return;

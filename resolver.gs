@@ -1,5 +1,5 @@
 /**
- * Short-link helper for Bookshelf of Memories.
+ * Helper for Bookshelf of Memories: expands short Google Maps links and stores the shared board.
  *
  * Google Maps "Share" links (https://maps.app.goo.gl/…) only reveal the
  * place they point to by redirecting, and browsers hide redirect targets
@@ -19,7 +19,14 @@
  * Test in a browser:  <your URL>?url=https://maps.app.goo.gl/XXXX
  * You should get {"url":"https://www.google.com/maps/place/…"}.
  */
+/*
+ * Shared board storage. Everyone with the board's link reads and writes the same
+ * documents, kept in this script's properties. Each write bumps a version number so
+ * open boards can poll for changes.
+ */
 function doGet(e) {
+  var op = e && e.parameter && e.parameter.op ? String(e.parameter.op) : '';
+  if (op === 'all') return reply_(readAll_(), e);
   var url = e && e.parameter && e.parameter.url ? String(e.parameter.url) : '';
   var result = { url: '', error: '' };
   if (!url) result.error = 'no url parameter';
@@ -34,6 +41,46 @@ function doGet(e) {
   if (cb && /^[\w$.]+$/.test(cb)) {
     return ContentService.createTextOutput(cb + '(' + body + ');').setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
+  return ContentService.createTextOutput(body).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  var body;
+  try { body = JSON.parse(e.postData.contents); } catch (err) { return reply_({ ok: false, error: 'bad json' }); }
+  var props = PropertiesService.getScriptProperties();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var v = Number(props.getProperty('v') || 0) + 1;
+    var writes = body.op === 'batch' ? (body.writes || []) : [body];
+    writes.forEach(function (w) {
+      var key = w.kind === 'trip' ? 'trip:' + w.id : 'event:' + w.tripId + ':' + w.id;
+      if (w.op === 'set') props.setProperty(key, JSON.stringify(w.data));
+      else if (w.op === 'delete') props.deleteProperty(key);
+      else if (w.op === 'deleteTrip') {
+        var all = props.getProperties();
+        Object.keys(all).forEach(function (k) { if (k === 'trip:' + w.id || k.indexOf('event:' + w.id + ':') === 0) props.deleteProperty(k); });
+      }
+    });
+    props.setProperty('v', String(v));
+    return reply_({ ok: true, v: v });
+  } finally { lock.releaseLock(); }
+}
+function readAll_() {
+  var all = PropertiesService.getScriptProperties().getProperties();
+  var out = { v: Number(all.v || 0), trips: {}, events: {} };
+  Object.keys(all).forEach(function (k) {
+    try {
+      if (k.indexOf('trip:') === 0) out.trips[k.slice(5)] = JSON.parse(all[k]);
+      else if (k.indexOf('event:') === 0) { var parts = k.split(':'); (out.events[parts[1]] = out.events[parts[1]] || {})[parts.slice(2).join(':')] = JSON.parse(all[k]); }
+    } catch (err) {}
+  });
+  return out;
+}
+function reply_(obj, e) {
+  var body = JSON.stringify(obj);
+  var cb = e && e.parameter && e.parameter.callback ? String(e.parameter.callback) : '';
+  if (cb && /^[\w$.]+$/.test(cb)) return ContentService.createTextOutput(cb + '(' + body + ');').setMimeType(ContentService.MimeType.JAVASCRIPT);
   return ContentService.createTextOutput(body).setMimeType(ContentService.MimeType.JSON);
 }
 

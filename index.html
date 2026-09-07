@@ -716,7 +716,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.21'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.22'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -2192,8 +2192,7 @@ function lightbox(im) {
   document.body.append(box);
 }
 function imagesPanel(ev) {
-  const note = el('div', { class: 'img-note' },
-    [S.imgNote, imagesTravel() ? '' : 'Pictures stay on this device: the shared helper cannot carry files yet.'].filter(Boolean).join(' '));
+  const note = S.imgNote ? el('div', { class: 'img-note' }, S.imgNote) : null;
   const pics = cardImages(ev);
   const grid = el('div', { class: 'img-grid' }, pics.map(im => el('div', { class: 'img-cell' },
     el('img', { src: im.data, alt: im.name, loading: 'lazy', onclick: () => lightbox(im) }),
@@ -2242,7 +2241,7 @@ function linksPanel(ev) {
     paint(url);
     return el('div', { class: 'link-row' }, ico, inp, open);
   });
-  return el('div', {}, ...rows, el('div', { class: 'img-note' }, 'TikTok, Instagram, YouTube, Xiaohongshu and Reddit are recognised by name; anything else keeps the plain link mark. A link opens in a new tab.'));
+  return el('div', {}, ...rows);
 }
 function refreshEditor() {
   if (!S.editingId) return;

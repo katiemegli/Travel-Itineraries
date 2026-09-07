@@ -7,7 +7,7 @@
 <title>Bookshelf of Memories</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Inter:wght@300;400;500&family=Shippori+Mincho:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Geist+Mono:wght@300;400;500;700&family=Homemade+Apple&family=Inter:wght@300;400;500&family=Shippori+Mincho:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* ---------- design tokens: paper, ink, sand, sky, cream, lemon, olive, terra ---------- */
 :root{
@@ -49,6 +49,45 @@ a{color:inherit}
 .rule::before{content:"";display:inline-block;width:32px;height:1px;background:var(--ink-30);margin-right:12px;vertical-align:middle}
 
 #app{min-height:100dvh;display:flex;flex-direction:column}
+
+/* ---------- a second skin, chosen per trip ----------
+   Colour and type only: the board keeps every element, class and behaviour it has
+   under the house style, so a trip can wear either without anything moving. */
+body[data-theme="mono"]{
+  --paper:#FAFAFA; --ink:#171717; --sand:#EBEBEB; --sky:#0075F5; --cream:#FFFFFF; --lemon:#FBBF24; --olive:#737373; --terra:#DC2626;
+  --ink-80:rgba(23,23,23,.8); --ink-70:rgba(23,23,23,.62); --ink-60:rgba(23,23,23,.55); --ink-50:rgba(23,23,23,.45); --ink-40:rgba(23,23,23,.36); --ink-30:rgba(23,23,23,.28); --ink-20:rgba(23,23,23,.16); --ink-10:rgba(23,23,23,.09); --ink-05:rgba(23,23,23,.05);
+  --bg:var(--paper); --panel:#FFFFFF; --panel-2:rgba(255,255,255,.6); --muted:#737373; --faint:rgba(23,23,23,.4); --line:rgba(23,23,23,.14); --line-soft:rgba(23,23,23,.07); --line-strong:var(--ink);
+  --accent:var(--ink); --accent-soft:rgba(0,117,245,.1); --accent-ink:var(--paper); --danger:var(--terra); --ok:var(--ink); --icon-idle:rgba(23,23,23,.3);
+  --script:'Homemade Apple',cursive;
+  --sans:'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --mincho:'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --shadow:0 1px 2px rgba(0,0,0,.04); --shadow-lg:0 20px 25px -5px rgba(0,0,0,.08),0 8px 10px -6px rgba(0,0,0,.06);
+  --dotted:linear-gradient(to right,rgba(23,23,23,.18) 33%,rgba(255,255,255,0) 0%);
+  background:#FAFAFA;
+}
+/* The header is flat here, closed by a hairline with a light edge under it. */
+body[data-theme="mono"] .top{background:#FAFAFA;border-bottom:1px solid var(--line);box-shadow:0 1px 0 0 rgba(255,255,255,.6)}
+body[data-theme="mono"] .hero-pad{padding:64px 0 72px}
+/* The handwritten face is for names only, and never slanted: it has no italic of its own. */
+body[data-theme="mono"] .trip-name{font:400 52px/1.25 var(--script);letter-spacing:0}
+body[data-theme="mono"] .bar-title{font:400 17px/1.3 var(--script)}
+body[data-theme="mono"] .col-head .dow{font:400 22px/1.3 var(--script)}
+body[data-theme="mono"] .unsched-title{font:400 20px/1.3 var(--script)}
+body[data-theme="mono"] .ed-title{font:400 24px/1.35 var(--script)}
+body[data-theme="mono"] .tut-title{font:400 21px/1.35 var(--script)}
+body[data-theme="mono"] .pola figcaption{font:400 12px/20px var(--sans);letter-spacing:.04em}
+body[data-theme="mono"] .trip-sub{font:400 13px/1.7 var(--sans);letter-spacing:.02em;color:var(--muted)}
+body[data-theme="mono"] .trip-kicker{font-weight:700}
+/* Small print carries the weight in this design. */
+body[data-theme="mono"] .label,body[data-theme="mono"] .section-h{font-weight:700;letter-spacing:.18em}
+/* Column headers are set small and bold here, the way the rest of the small print is. */
+body[data-theme="mono"] .check-title{font:700 12px/1.4 var(--sans);letter-spacing:.18em;text-transform:uppercase}
+body[data-theme="mono"] .card-cat,body[data-theme="mono"] .col-head .date{font-weight:500}
+body[data-theme="mono"] .title{font:400 14px/1.6 var(--mincho)}
+/* Marks sit in tinted pills rather than plain small caps. */
+body[data-theme="mono"] .card-res .st{background:var(--accent-soft);color:#0075F5;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:500}
+body[data-theme="mono"] .card{border-radius:6px}
+body[data-theme="mono"] .newcard,body[data-theme="mono"] .addday-btn,body[data-theme="mono"] .btn{border-radius:6px;font-weight:500}
 
 /* ---------- hero (top area) ---------- */
 .top{position:sticky;top:0;z-index:25;display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 var(--sp-lg);background:linear-gradient(135deg,#87BADB 0%,#aee1f9 50%,#FAF3E0 100%);border-bottom:1px solid var(--ink-10);overflow:hidden}
@@ -828,10 +867,15 @@ const LONDON_CARDS = [
   { date: '2026-08-30', time: '07:00', title: 'CPH → LHR', emoji: '✈️', notes: { Katie: 'Lands 8:10 AM' }, transport: { mode: 'flight', mins: null } },
   { date: '2026-08-30', time: '13:20', title: 'LHR → JFK', emoji: '✈️', notes: { Katie: 'Lands 4:15 PM' }, transport: { mode: 'flight', mins: null } },
 ];
+/* The August trip wears the second skin; set once, so changing it afterwards sticks. */
+function themeLondonTrip() {
+  const t = trip(); if (!t || t.id !== LONDON_ID || t.themeV) return;
+  t.theme = 'mono'; t.themeV = 1; saveTrip(t); applyTheme();
+}
 function seedLondonTrip() {
   if (S.trips[LONDON_ID] || Object.values(S.trips).some(t => t.seedsDone && t.seedsDone.london)) return;
   const t = newTrip({ name: 'London & Copenhagen', start: '2026-08-21', nDays: 0, travelers: ['Ryan', 'Katie'], cities: [] });
-  t.id = LONDON_ID; t.stays = clone(LONDON_STAYS); t.staysFixed = true;
+  t.id = LONDON_ID; t.theme = 'mono'; t.themeV = 1; t.stays = clone(LONDON_STAYS); t.staysFixed = true;
   t.hotels = LONDON_HOTELS.map(h => ({ id: uid(), ...h })); t.hotelsSeeded = true;
   applyStays(t);
   S.trips[t.id] = t; track(S.store.saveTrip(t));
@@ -943,9 +987,11 @@ function saveTrip(t, { debounced } = {}) {
   if (debounced) S.timers['trip:' + t.id] = setTimeout(write, 500); else write();
   renderAll();
 }
+function applyTheme() { const t = trip(); document.body.dataset.theme = (t && t.theme) || ''; }
 function selectTrip(id) {
   if (S.tripId === id) return;
   S.tripId = id; S.events = {}; S.pending = {}; S.day = null; S.dayJump = 'instant'; closeEditor();
+  applyTheme();
   LS.set('bookshelf-of-memories/last-trip', id);
   if (S.unsubEvents) { S.unsubEvents(); S.unsubEvents = null; }
   if (!id) { renderAll(); return; }
@@ -954,7 +1000,7 @@ function selectTrip(id) {
     for (const e of list) next[e.id] = S.pending[e.id] || normalizeEvent(e, t);
     for (const pid in S.pending) if (!next[pid] && S.pending[pid]) next[pid] = S.pending[pid];
     S.events = next;
-    migrateLondonTrip(); fixStayOrder(); seedHotels(); seedItinerary(); dropSeedDuplicates();
+    migrateLondonTrip(); fixStayOrder(); seedHotels(); seedItinerary(); dropSeedDuplicates(); themeLondonTrip();
     renderAll(); refreshEditor();
   }, e => { S.lastError = 'Lost connection to shared trip'; setStatus(); });
   renderAll();
@@ -1369,7 +1415,7 @@ const directionsUrl = (a, b, mode) => hasCoords(a) && hasCoords(b)
   ? `https://www.google.com/maps/dir/?api=1&origin=${a.place.lat},${a.place.lng}&destination=${b.place.lat},${b.place.lng}&travelmode=${DIR_MODE[mode] || 'transit'}` : '';
 
 /* ================= render: top ================= */
-function renderAll() { renderTop(); renderFilters(); renderBoard(); }
+function renderAll() { applyTheme(); renderTop(); renderFilters(); renderBoard(); }
 function renderTop() {
   const top = $('#top'); top.replaceChildren();
   const t = trip();

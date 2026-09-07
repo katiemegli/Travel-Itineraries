@@ -135,7 +135,11 @@ body[data-theme="undertone"] .checklist{background:rgba(255,255,255,.3);backdrop
 body[data-theme="undertone"] .ucard{background:rgba(255,255,255,.24);border:1px solid #000}
 body[data-theme="undertone"] .unsched-section{border-top:1px solid #000}
 body[data-theme="undertone"] .newcard,body[data-theme="undertone"] .addday-btn,body[data-theme="undertone"] .btn{border:1px solid #000}
-body[data-theme="undertone"] .link .addtr,body[data-theme="undertone"] .link .chip{background:transparent}
+/* The dotted rule belongs to the card above and would otherwise run straight through the
+   travel text. A solid patch cannot work over a gradient, so the row blurs what is behind it
+   instead: the dots dissolve, and the gradient, being smooth already, is unchanged. */
+body[data-theme="undertone"] .link .addtr,body[data-theme="undertone"] .link .chip{
+  background:transparent;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
 body[data-theme="undertone"] .col:last-child{border-right:none}
 /* The tabs and everything below them ride on the design's half-opaque panel, blurred and
    lifted off the gradient, so the small type stays legible without flattening the colour. */
@@ -677,7 +681,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.16'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.17'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

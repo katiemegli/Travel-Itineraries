@@ -667,7 +667,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.9'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.10'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -921,10 +921,16 @@ const LONDON_CARDS = [
   { date: '2026-08-30', time: '07:00', title: 'CPH → LHR', emoji: '✈️', notes: { Katie: 'Lands 8:10 AM' }, transport: { mode: 'flight', mins: null } },
   { date: '2026-08-30', time: '13:20', title: 'LHR → JFK', emoji: '✈️', notes: { Katie: 'Lands 4:15 PM' }, transport: { mode: 'flight', mins: null } },
 ];
-/* The August trip wears the second skin; set once, so changing it afterwards sticks. */
+/* Which board wears which skin. Matched on the trip's name, so a board made on any
+   device is dressed too, and only once: changing a skin afterwards sticks. */
+const TRIP_SKINS = [
+  { match: t => t.id === LONDON_ID || /^london/i.test(t.name || ''), theme: 'mono' },
+  { match: t => /^tampa\b/i.test((t.name || '').trim()), theme: 'undertone' },
+];
 function themeLondonTrip() {
-  const t = trip(); if (!t || t.id !== LONDON_ID || t.themeV) return;
-  t.theme = 'mono'; t.themeV = 1; saveTrip(t); applyTheme();
+  const t = trip(); if (!t || t.themeV) return;
+  const skin = TRIP_SKINS.find(s => s.match(t)); if (!skin) return;
+  t.theme = skin.theme; t.themeV = 1; saveTrip(t); applyTheme();
 }
 function seedLondonTrip() {
   if (S.trips[LONDON_ID] || Object.values(S.trips).some(t => t.seedsDone && t.seedsDone.london)) return;

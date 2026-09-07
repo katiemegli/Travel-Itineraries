@@ -20,7 +20,7 @@ Submitting creates one card. Cards sort by date, then time. A card without a tim
 
 The row between two cards shows how long it takes to get from the card above to the one below. It is computed automatically when both cards have a map pin, from the best source available:
 
-1. **Google Maps directions**, when a Google Maps API key is set. Walking under 35 minutes shows as a walk, otherwise transit under 45 minutes shows as subway, otherwise driving shows as car.
+1. **Google Maps directions**, when a Google Maps API key is set. Walking under 35 minutes shows as a walk, otherwise transit under 45 minutes shows as subway, otherwise driving shows as car. Every option is listed after the chosen one, except that a walk under 25 minutes hides the car. Rows show an icon and minutes only.
 2. **OpenStreetMap routing** (no key needed) when the page can reach the internet. Walking under 35 minutes shows as a walk, otherwise driving shows as car. OpenStreetMap has no transit times, so subway never appears without a Google key.
 3. **A straight-line estimate** between the two pins, marked with a tilde, when neither service is reachable. This is what the hosted Claude artifact shows, because it blocks outside requests.
 

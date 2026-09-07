@@ -494,7 +494,7 @@ const icon = name => { const s = el('span'); s.innerHTML = ICONS[name]; return s
 /* ================= constants ================= */
 const MODES = {
   walk:   { label: 'walk',    icon: '🚶', h: 145 },
-  subway: { label: 'subway',  icon: '🚇', h: 215 },
+  subway: { label: 'subway',  icon: '🚆', h: 215 },
   bus:    { label: 'bus',     icon: '🚌', h: 215 },
   tram:   { label: 'tram',    icon: '🚋', h: 215 },
   train:  { label: 'train',   icon: '🚆', h: 245 },
@@ -507,6 +507,8 @@ const MODES = {
 };
 const TIME_H = 325;
 const WALK_MAX = 35, TRANSIT_MAX = 45; // minutes: walk under 35, subway under 45, otherwise car
+const WALK_NO_CAR = 25;                 // a walk under 25 minutes hides the car option altogether
+const AUTO_V = 3;                       // bump when the row rules change so stored rows are recomputed
 // List order doubles as the sort order for cards without a time.
 const DEFAULT_CATEGORIES = [
   { id: 'lunch',    name: 'Lunch',        emoji: '🥪', h: 40,  autoTime: '12:00', sortTime: '12:00' },
@@ -581,8 +583,9 @@ class ScriptStore {
     const j = await Promise.race([this.fetchAll(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))]);
     if (!j || typeof j.v !== 'number') throw new Error('not a store');
     this.apply(j);
-    this.timer = setInterval(() => this.poll(), 20000);
+    this.timer = setInterval(() => this.poll(), 10000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.poll(); });
+    window.addEventListener('focus', () => this.poll());
     return this;
   }
   apply(j) { this.v = j.v; this.data = { trips: j.trips || {}, events: j.events || {} }; }
@@ -612,6 +615,18 @@ class ScriptStore {
     for (let i = 0; i < writes.length; i += 40) await this.send({ op: 'batch', writes: writes.slice(i, i + 40) });
     this.data = clone(local);
   }
+  /* Anything written on this device while the shared store was unreachable is sent up,
+     newest wins, and nothing already shared is thrown away. */
+  async merge(local) {
+    const writes = [];
+    const newer = (mine, theirs) => !theirs || (mine.updatedAt || 0) > (theirs.updatedAt || 0);
+    for (const t of Object.values(local.trips)) if (newer(t, this.data.trips[t.id])) { this.data.trips[t.id] = t; writes.push({ op: 'set', kind: 'trip', id: t.id, data: t }); }
+    for (const [tid, evs] of Object.entries(local.events)) for (const e of Object.values(evs)) {
+      if (newer(e, (this.data.events[tid] || {})[e.id])) { (this.data.events[tid] ||= {})[e.id] = e; writes.push({ op: 'set', kind: 'event', tripId: tid, id: e.id, data: e }); }
+    }
+    for (let i = 0; i < writes.length; i += 40) await this.send({ op: 'batch', writes: writes.slice(i, i + 40) });
+    return writes.length;
+  }
 }
 
 /* ================= state ================= */
@@ -622,6 +637,7 @@ const S = {
   showArchived: false, catFilter: '',
   editingId: null, unsubEvents: null,
   savingCount: 0, lastError: null,
+  offline: false, sharedRetry: 0, unsubTrips: null, onTrips: null, onTripsError: null,
   maps: { state: 'off', error: '', promise: null }, // off | loading | ready | failed
   osm: { state: 'unknown' }, // unknown | ok | blocked  (the hosted artifact blocks outside requests)
   autoBusy: false, autoAgain: false,
@@ -730,11 +746,11 @@ function normalizeEvent(ev, t) {
 function setStatus() {
   const s = $('#status'); if (!s) return;
   s.className = 'status';
-  const where = S.backend === 'shared' ? 'shared with everyone who has the link' : (S.offline ? 'saved on this device only (the shared store could not be reached)' : 'saved on this device');
+  const where = S.backend === 'shared' ? 'shared with everyone who has the link' : (S.offline ? 'saved on this device only for now (the shared store did not answer; this page keeps trying and will send everything up as soon as it does)' : 'saved on this device');
   if (S.lastError) { s.classList.add('err'); s.querySelector('.txt').textContent = S.lastError; s.title = S.lastError; return; }
   if (S.maps.error) { s.classList.add('err'); s.querySelector('.txt').textContent = 'Maps: ' + S.maps.error; s.title = S.maps.error + ' Check the key in trip settings.'; return; }
   if (S.savingCount > 0) { s.classList.add('busy'); s.querySelector('.txt').textContent = 'Saving…'; }
-  else { s.classList.add('ok'); s.querySelector('.txt').textContent = S.backend === 'shared' ? 'Synced' : (S.offline ? 'Offline' : 'Saved'); }
+  else { s.classList.add('ok'); s.querySelector('.txt').textContent = S.backend === 'shared' ? 'Synced' : (S.offline ? 'This device only' : 'Saved'); }
   s.title = `Changes are ${where} automatically`;
 }
 async function track(p) {
@@ -1101,7 +1117,11 @@ async function duration(a, b, mode) {
   } catch (e) { if (!/ZERO_RESULTS/.test(String(e))) { console.warn(e); S.maps.error = 'Directions failed: ' + (e.message || e); } }
   durCache.set(k, mins); return mins;
 }
-const withAlts = (primary, all) => ({ ...primary, v: 2, alts: all.filter(x => x && x.mode !== primary.mode) }); // the chosen way first, every other option after it
+const withAlts = (primary, all) => { // the chosen way first, every other option after it; a short walk drops the car
+  const walk = all.find(x => x && x.mode === 'walk');
+  const shortWalk = walk && walk.mins < WALK_NO_CAR;
+  return { ...primary, v: AUTO_V, alts: all.filter(x => x && x.mode !== primary.mode && !(shortWalk && x.mode === 'drive')) };
+};
 async function googlePair(a, b) {
   // Walk under 35, else subway under 45, else car. Every option Google returns is shown.
   const walk = await duration(a, b, 'WALKING');
@@ -1142,13 +1162,19 @@ async function updateAutoTransport() {
       for (let i = 0; i < evs.length; i++) {
         const b = evs[i], a = evs[i - 1] || hotelOrigin(t, date); // a day's first stop starts from that day's hotel
         const key = a ? pairKey(a, b) : '';
-        if (!key) { if (b.auto) patchEvent(b.id, { auto: null }, { immediate: true }); continue; }
+        if (!key) {
+          // No origin right now. Clear a row only when the card it came from is gone; a hotel row stays until the hotel is resolved here.
+          const fromCard = b.auto && b.auto.from !== 'hotel' && !(hotelFor(t, date) && i === 0);
+          if (b.auto && fromCard && (evs[i - 1] || !hotelFor(t, date))) patchEvent(b.id, { auto: null }, { immediate: true });
+          continue;
+        }
         const available = mapsReady() ? 2 : osmOk() ? 1 : 0; // google > openstreetmap > straight-line estimate
-        if (b.auto && b.auto.key === key && (b.auto.rank || 0) >= available && b.auto.v === 2) continue; // rows from before "show every option" are recomputed
+        if (b.auto && b.auto.key === key && (b.auto.rank || 0) >= available && b.auto.v === AUTO_V) continue; // rows computed under older rules are recomputed
         S.autoDone ||= {};
         if (S.autoDone[key] >= available && b.auto && b.auto.key === key) continue; // already computed this session: never flip back and forth
+        const from = a.hotel ? 'hotel' : 'card';
         if (haversine(a.place, b.place) > 300000) { // different cities: no sensible leg
-          if (!b.auto || b.auto.key !== key || !b.auto.none) patchEvent(b.id, { auto: { key, none: true, v: 2, rank: available, at: Date.now() } }, { immediate: true });
+          if (!b.auto || b.auto.key !== key || !b.auto.none) patchEvent(b.id, { auto: { key, none: true, v: AUTO_V, rank: available, from, at: Date.now() } }, { immediate: true });
           S.autoDone[key] = available; continue;
         }
         let r = null;
@@ -1158,7 +1184,8 @@ async function updateAutoTransport() {
         if (!r) r = { ...estimatePair(a, b), rank: 0 };
         S.autoDone[key] = r.rank;
         if (b.auto && b.auto.key === key && b.auto.rank === r.rank && b.auto.mode === r.mode && b.auto.mins === r.mins) continue;
-        patchEvent(b.id, { auto: { key, ...r, at: Date.now() } }, { immediate: true });
+        if (b.auto && b.auto.key === key && (b.auto.rank || 0) > r.rank) continue; // someone else computed it with better data: keep theirs
+        patchEvent(b.id, { auto: { key, ...r, from, at: Date.now() } }, { immediate: true });
       }
     }
   } finally { S.autoBusy = false; if (S.autoAgain) { S.autoAgain = false; scheduleAuto(); } }
@@ -1392,11 +1419,10 @@ function transportChip(tr, attrs = {}, tag = 'span') {
   const m = MODES[tr.mode];
   const parts = [];
   if (tr.mins) parts.push(`${tr.est ? '~' : ''}${tr.mins} min`);
-  if (m) parts.push(m.label);
   const alts = (tr.alts || (tr.alt ? [tr.alt] : [])).filter(x => x && MODES[x.mode]);
-  const opt = (icon, text) => el('span', { class: 'opt' }, icon && el('span', { class: 'mi', 'aria-hidden': 'true' }, icon), text);
-  const rest = alts.flatMap(x => [el('span', { class: 'sep', 'aria-hidden': 'true' }, '·'), opt(MODES[x.mode].icon, `${x.mins} min ${MODES[x.mode].label}`)]);
-  return el(tag, { class: 'chip' + (m ? ' tone' : '') + (tr.est ? ' est' : ''), style: m ? `--h:${m.h}` : '', ...attrs }, opt(m && m.icon, parts.join(' ')), ...rest);
+  const opt = (icon, text, label) => el('span', { class: 'opt', title: label || '', 'aria-label': label ? `${text} ${label}` : text }, icon && el('span', { class: 'mi', 'aria-hidden': 'true' }, icon), text);
+  const rest = alts.flatMap(x => [el('span', { class: 'sep', 'aria-hidden': 'true' }, '·'), opt(MODES[x.mode].icon, `${x.mins} min`, MODES[x.mode].label)]);
+  return el(tag, { class: 'chip' + (m ? ' tone' : '') + (tr.est ? ' est' : ''), style: m ? `--h:${m.h}` : '', ...attrs }, opt(m && m.icon, parts.join(' '), m && m.label), ...rest);
 }
 function renderCard(ev) {
   const t = trip();
@@ -1818,7 +1844,7 @@ const TUT_PAGES = [
   { kicker: 'No. 1 Our checklist', title: 'Three little columns', body: 'Lunch, Afternoon, Dinner. The number in the corner is how many days still need one, and every date has a tiny box. Tap an empty date, pick something yummy, and the box ticks itself for us ✨', img: 'checklist', caption: 'Our planner checklist', rot: -1.5 },
   { kicker: 'No. 2 Celebrate', title: 'Every full day is a party 🎉', body: 'When a day has all three, confetti rains down over the whole board.', img: 'confetti', caption: 'Confetti for a finished day', rot: 2 },
   { kicker: 'No. 3 Add a stop', title: 'Easy peasy 🍜', body: 'Press New under a day. Type a place and pick it from the list, or paste a Google Maps link, and the name and pin fill themselves in. Lunch sets 12:00 PM, Dinner 5:30 PM automatically (changeable, ofc). Leave me a note if you want to!', img: 'add', caption: 'Adding Jay Fai to Friday', rot: -2 },
-  { kicker: 'No. 4 Getting there', title: 'No getting lost, promise 🚇', body: 'Once two stops have pins, the line between them works out the trip on its own: a walk if it\'s short, the subway if it\'s under 45 minutes, otherwise a car, with every option listed. Tap it and Google Maps opens the directions.', img: 'transport', caption: 'Tokyo, Thursday', rot: 1.5 },
+  { kicker: 'No. 4 Getting there', title: 'No getting lost, promise 🚆', body: 'Once two stops have pins, the line between them works out the trip on its own: a walk if it\'s short, the subway if it\'s under 45 minutes, otherwise a car, with every option listed. Tap it and Google Maps opens the directions.', img: 'transport', caption: 'Tokyo, Thursday', rot: 1.5 },
 ];
 function tutorialDialog() {
   let i = 0;
@@ -1989,11 +2015,14 @@ async function boot() {
       const remoteEmpty = !Object.keys(shared.data.trips).length, localHas = Object.keys(local.data.trips).length > 0;
       if (remoteEmpty && localHas) { try { await shared.adopt(local.data); } catch (e) { console.warn(e); } }
       S.store = shared; S.backend = 'shared';
-    } else { S.store = local; S.backend = 'local'; S.lastError = ''; S.offline = true; }
+    } else {
+      S.store = local; S.backend = 'local'; S.lastError = ''; S.offline = true;
+      retryShared(local); // keep trying, so this visitor joins the shared board as soon as it answers
+    }
   }
 
   let first = true;
-  S.store.watchTrips(list => {
+  const onTrips = list => {
     const next = {};
     for (const t of list) next[t.id] = S.pendingTrip[t.id] || normalizeTrip(t);
     for (const id in S.pendingTrip) if (!next[id]) next[id] = S.pendingTrip[id];
@@ -2014,7 +2043,28 @@ async function boot() {
     }
     for (const id in S.events) normalizeEvent(S.events[id], trip());
     renderAll();
-  }, e => { S.lastError = 'Could not open the shared trip'; S.ready = true; renderAll(); });
+  };
+  const onTripsError = e => { S.lastError = 'Could not open the shared trip'; S.ready = true; renderAll(); };
+  S.onTrips = onTrips; S.onTripsError = onTripsError;
+  S.unsubTrips = S.store.watchTrips(onTrips, onTripsError);
+}
+
+/* The shared store can be slow or briefly unreachable when the page loads. Keep asking:
+   the moment it answers, this device's work goes up and the board follows everyone else. */
+function retryShared(local) {
+  if (!DEFAULT_RESOLVER_URL || S.sharedRetry) return;
+  S.sharedRetry = setInterval(async () => {
+    if (S.backend === 'shared') { clearInterval(S.sharedRetry); S.sharedRetry = 0; return; }
+    let shared = null;
+    try { shared = await new ScriptStore(DEFAULT_RESOLVER_URL).init(); } catch (e) { return; }
+    clearInterval(S.sharedRetry); S.sharedRetry = 0;
+    try { await shared.merge(local.data); } catch (e) { console.warn(e); }
+    S.unsubTrips && S.unsubTrips(); S.unsubEvents && S.unsubEvents(); S.unsubEvents = null;
+    S.store = shared; S.backend = 'shared'; S.offline = false; S.lastError = null;
+    S.unsubTrips = S.store.watchTrips(S.onTrips, S.onTripsError);
+    if (S.tripId) selectTrip(S.tripId);
+    setStatus(); renderAll();
+  }, 30000);
 }
 boot();
 })();

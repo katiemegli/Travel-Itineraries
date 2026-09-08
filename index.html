@@ -726,7 +726,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.38'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.39'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -848,6 +848,15 @@ class ScriptStore {
       try { await this.post({ op: 'ping', pad: 'x'.repeat(kb * 1000) }); out.largest = kb; }
       catch (e) { out.failedAt = kb; out.why = (e && e.message) || 'failed'; break; }
     }
+    // and a real picture, one pixel, all the way into Drive and out again
+    const tiny = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    try {
+      const id = uid() + uid();
+      await this.post({ op: 'putChunk', uploadId: id, i: 0, n: 1, chunk: tiny });
+      const j = await this.post({ op: 'putImage', uploadId: id, n: 1, name: 'board-test.gif' });
+      out.picture = j.fileId ? 'kept in Drive' : 'the helper answered without a file id';
+      if (j.fileId) this.deleteImage(j.fileId);
+    } catch (e) { out.picture = (e && e.message) || 'failed'; }
     return out;
   }
   deleteImage(fileId) {
@@ -2654,8 +2663,8 @@ function settingsDialog() {
         e.target.disabled = true; out.textContent = 'Asking the helper…';
         const r = await S.store.probe(); e.target.disabled = false;
         out.textContent = r.small !== 'answered' ? 'The helper refused even a small request: ' + r.small
-          : r.failedAt ? `The helper answered requests up to ${r.largest} KB and refused ${r.failedAt} KB: ${r.why}`
-          : `The helper answered every request tried, up to ${r.largest} KB.`;
+          : (r.failedAt ? `The helper answered requests up to ${r.largest} KB and refused ${r.failedAt} KB: ${r.why}` : `The helper answered every request tried, up to ${r.largest} KB.`)
+            + ` A one-pixel test picture: ${r.picture}.`;
         if (r.largest) ScriptStore.piece = Math.min(64000, Math.max(8000, r.largest * 1000 - 2000));
       } }, 'Test the helper')), out);
     }

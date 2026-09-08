@@ -49,7 +49,14 @@ function doGet(e) {
   return ContentService.createTextOutput(body).setMimeType(ContentService.MimeType.JSON);
 }
 
+/* Whatever goes wrong inside, the answer is JSON that says so. An exception that escapes a
+   web app comes back as an error page without the header browsers need, and the board can
+   only report that the request was turned away. */
 function doPost(e) {
+  try { return doPost_(e); }
+  catch (err) { return reply_({ ok: false, error: String(err && err.message || err) }); }
+}
+function doPost_(e) {
   var body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return reply_({ ok: false, error: 'bad json' }); }
   if (body.op === 'ping') return reply_({ ok: true, pong: true, bytes: String(e.postData.contents).length });

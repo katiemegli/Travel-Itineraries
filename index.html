@@ -726,7 +726,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.35'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.36'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -828,6 +828,16 @@ class ScriptStore {
     const j = await this.post({ op: 'putImage', uploadId, n, name: im.name });
     if (!j.fileId) throw new Error('The helper did not keep the picture.');
     return j.fileId;
+  }
+  /* Two trial requests, one tiny and one the size of a picture piece, so a helper that refuses
+     everything and one that only drops large requests can be told apart. */
+  async probe() {
+    const out = { small: '', large: '' };
+    for (const [k, body] of [['small', { op: 'ping' }], ['large', { op: 'ping', pad: 'x'.repeat(64000) }]]) {
+      try { await this.post(body); out[k] = 'answered'; }
+      catch (e) { out[k] = (e && e.message) || 'failed'; }
+    }
+    return out;
   }
   deleteImage(fileId) {
     return fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ op: 'deleteImage', fileId }), redirect: 'follow' }).catch(e => console.warn(e));
@@ -2627,7 +2637,17 @@ function settingsDialog() {
     if (S.store && S.store.hint) kids.push(el('span', { class: 'hint' }, S.store.hint));
     if (q) kids.push(el('span', { class: 'hint' }, `${q} change${q === 1 ? '' : 's'} still to go up.`),
       el('div', {}, el('button', { class: 'btn', onclick: async e => { e.target.disabled = true; await S.store.flushQueue(); renderSharing(); setStatus(); } }, 'Send them now')));
-    kids.push(el('span', { class: 'hint' }, `${Object.keys(S.events).length} cards here · board version ${BUILD}`));
+    if (S.store && S.store.probe) {
+      const out = el('span', { class: 'hint' });
+      kids.push(el('div', {}, el('button', { class: 'btn', onclick: async e => {
+        e.target.disabled = true; out.textContent = 'Asking the helper…';
+        const r = await S.store.probe(); e.target.disabled = false;
+        out.textContent = r.small === 'answered' && r.large === 'answered' ? 'The helper answered both a small and a large request. Writes and pictures should work.'
+          : r.small === 'answered' ? 'The helper answered a small request but not a large one: ' + r.large
+          : 'The helper refused even a small request: ' + r.small;
+      } }, 'Test the helper')), out);
+    }
+    kids.push(el('span', { class: 'hint' }, `${Object.keys(S.events).length} cards here · board version ${BUILD} · helper …${DEFAULT_RESOLVER_URL.slice(-20, -5)}`));
     sharingBox.replaceChildren(...kids);
   };
   renderSharing();

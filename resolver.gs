@@ -52,6 +52,7 @@ function doGet(e) {
 function doPost(e) {
   var body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return reply_({ ok: false, error: 'bad json' }); }
+  if (body.op === 'ping') return reply_({ ok: true, pong: true, bytes: String(e.postData.contents).length });
   if (body.op === 'putChunk') return reply_(putChunk_(body));
   if (body.op === 'putImage') return reply_(putImage_(body));
   if (body.op === 'deleteImage') return reply_(deleteImage_(body));

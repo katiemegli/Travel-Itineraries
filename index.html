@@ -726,7 +726,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.36'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.37'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -818,13 +818,20 @@ class ScriptStore {
     return j;
   }
   async putImage(im, onProgress) {
-    const PIECE = 64000, data = im.data, n = Math.ceil(data.length / PIECE);
+    // One piece at a time: the helper answered a lone request of this size every time it was
+    // asked, and dropped them when several arrived together. Each piece gets three tries.
+    const PIECE = 90000, data = im.data, n = Math.ceil(data.length / PIECE);
     const uploadId = uid() + uid();
-    let done = 0;
-    const send = async i => { await this.post({ op: 'putChunk', uploadId, i, n, chunk: data.slice(i * PIECE, (i + 1) * PIECE) }); done += 1; onProgress && onProgress(done, n); };
-    // three pieces in flight at a time
-    const queue = [...Array(n).keys()];
-    await Promise.all([0, 1, 2, 3].map(async () => { while (queue.length) await send(queue.shift()); }));
+    for (let i = 0; i < n; i++) {
+      const body = { op: 'putChunk', uploadId, i, n, chunk: data.slice(i * PIECE, (i + 1) * PIECE) };
+      let last = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try { await this.post(body); last = null; break; }
+        catch (e) { last = e; await new Promise(r => setTimeout(r, 600 * (attempt + 1))); }
+      }
+      if (last) throw new Error(`Piece ${i + 1} of ${n} would not go: ${last.message}`);
+      onProgress && onProgress(i + 1, n);
+    }
     const j = await this.post({ op: 'putImage', uploadId, n, name: im.name });
     if (!j.fileId) throw new Error('The helper did not keep the picture.');
     return j.fileId;

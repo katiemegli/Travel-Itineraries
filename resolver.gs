@@ -52,6 +52,7 @@ function doGet(e) {
 function doPost(e) {
   var body;
   try { body = JSON.parse(e.postData.contents); } catch (err) { return reply_({ ok: false, error: 'bad json' }); }
+  if (body.op === 'putChunk') return reply_(putChunk_(body));
   if (body.op === 'putImage') return reply_(putImage_(body));
   if (body.op === 'deleteImage') return reply_(deleteImage_(body));
   var props = PropertiesService.getScriptProperties();
@@ -79,8 +80,27 @@ function folder_() {
   var it = DriveApp.getFoldersByName(IMAGE_FOLDER);
   return it.hasNext() ? it.next() : DriveApp.createFolder(IMAGE_FOLDER);
 }
+/* A picture arrives in pieces, each small enough to be an ordinary request, held briefly in
+   the script cache until the last piece says the whole thing is there. */
+function putChunk_(w) {
+  var id = String(w.uploadId || ''), i = Number(w.i);
+  if (!/^[\w-]{4,40}$/.test(id) || !(i >= 0 && i < 200)) return { ok: false, error: 'bad piece' };
+  CacheService.getScriptCache().put('up:' + id + ':' + i, String(w.chunk || ''), 1200);
+  return { ok: true };
+}
 function putImage_(w) {
-  var m = /^data:([^;]+);base64,(.*)$/.exec(String(w.data || ''));
+  var data = String(w.data || '');
+  if (!data && w.uploadId) {
+    var cache = CacheService.getScriptCache(), n = Number(w.n || 0), parts = [];
+    for (var i = 0; i < n; i++) {
+      var c = cache.get('up:' + w.uploadId + ':' + i);
+      if (c == null) return { ok: false, error: 'piece ' + (i + 1) + ' of ' + n + ' did not arrive' };
+      parts.push(c);
+    }
+    data = parts.join('');
+    for (var j = 0; j < n; j++) cache.remove('up:' + w.uploadId + ':' + j);
+  }
+  var m = /^data:([^;]+);base64,(.*)$/.exec(data);
   if (!m) return { ok: false, error: 'not a picture' };
   if (m[1].indexOf('image/') !== 0) return { ok: false, error: 'not a picture' };
   var name = String(w.name || 'photo').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 120) || 'photo';

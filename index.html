@@ -726,7 +726,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.32'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.33'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -797,13 +797,27 @@ class ScriptStore {
   watchTrips(cb) { this.tripCb = cb; cb(Object.values(this.data.trips)); return () => { this.tripCb = null; }; }
   watchEvents(tripId, cb) { this.evCb = cb; this.evTrip = tripId; cb(Object.values(this.data.events[tripId] || {})); return () => { this.evCb = null; }; }
   keep(fn) { if (this.mirror) Promise.resolve(fn()).catch(e => console.warn('device copy', e)); }
-  /* Pictures go to Drive by way of the helper and come back as a file id. This is not queued
-     like other writes: the picture is large and the answer is needed before the card can keep it. */
-  async putImage(im) {
-    const r = await fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ op: 'putImage', name: im.name, data: im.data }), redirect: 'follow' });
+  /* Pictures go to Drive by way of the helper and come back as a file id. A picture is far
+     larger than any other request the board makes, and a phone browser was seen to drop it in
+     one piece, so it is sent in pieces of ordinary size and the helper puts them back together.
+     This is not queued like other writes: the answer is needed before the card can keep it. */
+  async post(body) {
+    const r = await fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' });
     const text = await r.text(); let j = null;
     try { j = JSON.parse(text); } catch { throw new Error(this.readHint(text)); }
-    if (!j.ok || !j.fileId) throw new Error(j.error || 'The helper did not keep the picture.');
+    if (!j.ok) throw new Error(j.error || 'The helper refused.');
+    return j;
+  }
+  async putImage(im, onProgress) {
+    const PIECE = 48000, data = im.data, n = Math.ceil(data.length / PIECE);
+    const uploadId = uid() + uid();
+    let done = 0;
+    const send = async i => { await this.post({ op: 'putChunk', uploadId, i, n, chunk: data.slice(i * PIECE, (i + 1) * PIECE) }); done += 1; onProgress && onProgress(done, n); };
+    // three pieces in flight at a time
+    const queue = [...Array(n).keys()];
+    await Promise.all([0, 1, 2].map(async () => { while (queue.length) await send(queue.shift()); }));
+    const j = await this.post({ op: 'putImage', uploadId, n, name: im.name });
+    if (!j.fileId) throw new Error('The helper did not keep the picture.');
     return j.fileId;
   }
   deleteImage(fileId) {
@@ -2168,7 +2182,7 @@ function closeEditor() {
    and the artifact the picture rides inside the card. If the helper does not answer, the picture
    stays on this device and the panel says so. */
 const IMG_LS = 'bookshelf-of-memories/images';
-const MAX_IMG_SIDE = 1400, IMG_QUALITY = 0.72, MAX_IMAGES = 24;
+const MAX_IMG_SIDE = 1280, IMG_QUALITY = 0.7, MAX_IMAGES = 24;
 /* Drive serves a shared picture from several addresses, and which one answers has varied over
    the years, so a picture tries them in turn until one loads. */
 const driveUrls = (fileId, w) => { const id = encodeURIComponent(fileId); return [
@@ -2225,11 +2239,15 @@ async function addImages(ev, files) {
   const over = Math.max(0, pics.length - room);
   const travel = [], local = [];
   let helperDown = false;
-  S.imgNote = pics.length ? 'Adding…' : ''; renderEditor();
+  S.imgNote = pics.length ? 'Sending…' : ''; renderEditor();
   for (const f of pics.slice(0, room)) {
     let im; try { im = await shrinkImage(f); } catch (e) { console.warn(e); continue; }
     if (viaDrive() && !helperDown) {
-      try { const fileId = await S.store.putImage(im); travel.push({ id: im.id, name: im.name, w: im.w, h: im.h, at: im.at, fileId }); continue; }
+      try {
+        const say = (d, n) => { S.imgNote = n > 1 ? `Sending… ${d} of ${n}` : 'Sending…'; const note = $('#editor .img-note'); if (note) note.textContent = S.imgNote; };
+        const fileId = await S.store.putImage(im, say);
+        travel.push({ id: im.id, name: im.name, w: im.w, h: im.h, at: im.at, fileId }); continue;
+      }
       catch (e) { console.warn('picture stayed on the device', e); helperDown = (e && e.message) || true; }
     }
     if (viaDrive()) local.push(im); else travel.push(im);

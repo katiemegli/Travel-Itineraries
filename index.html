@@ -726,7 +726,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.34'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.35'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -758,7 +758,9 @@ class ScriptStore {
   }
   emit() { this.tripCb && this.tripCb(Object.values(this.data.trips)); this.evCb && this.evCb(Object.values(this.data.events[this.evTrip] || {})); }
   async raw(body) {
-    const r = await fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' });
+    let r;
+    try { r = await fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' }); }
+    catch (e) { this.hint = ScriptStore.REFUSED; throw new Error(this.hint); }
     const text = await r.text();
     if (!r.ok) { this.hint = 'The shared board answered ' + r.status + '.'; throw new Error(this.hint); }
     let j = null; try { j = JSON.parse(text); } catch { this.hint = this.readHint(text); throw new Error(this.hint); }
@@ -801,8 +803,15 @@ class ScriptStore {
      larger than any other request the board makes, and a phone browser was seen to drop it in
      one piece, so it is sent in pieces of ordinary size and the helper puts them back together.
      This is not queued like other writes: the answer is needed before the card can keep it. */
+  /* A browser that reports "Failed to fetch" or "Load failed" was turned back before the helper
+     answered: almost always a deployment that demands a Google sign-in, which a page on another
+     site is not allowed to follow. Reads still work by another route, which is why the board
+     looks fine while nothing written ever lands. */
+  static REFUSED = 'The helper turned the request away before answering. In Apps Script: Deploy → Manage deployments → pencil → set "Execute as" to Me and "Who has access" to Anyone, then Deploy.';
   async post(body) {
-    const r = await fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' });
+    let r;
+    try { r = await fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' }); }
+    catch (e) { throw new Error(ScriptStore.REFUSED); }
     const text = await r.text(); let j = null;
     try { j = JSON.parse(text); } catch { throw new Error(this.readHint(text)); }
     if (!j.ok) throw new Error(j.error || 'The helper refused.');

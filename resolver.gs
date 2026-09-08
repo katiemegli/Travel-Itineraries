@@ -84,7 +84,7 @@ function folder_() {
    the script cache until the last piece says the whole thing is there. */
 function putChunk_(w) {
   var id = String(w.uploadId || ''), i = Number(w.i);
-  if (!/^[\w-]{4,40}$/.test(id) || !(i >= 0 && i < 200)) return { ok: false, error: 'bad piece' };
+  if (!/^[\w-]{4,40}$/.test(id) || !(i >= 0 && i < 600)) return { ok: false, error: 'bad piece' }; // up to about 36 MB
   CacheService.getScriptCache().put('up:' + id + ':' + i, String(w.chunk || ''), 1200);
   return { ok: true };
 }

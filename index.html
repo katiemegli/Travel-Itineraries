@@ -679,7 +679,7 @@ const DEFAULT_MAPS_KEY = 'AIzaSyDuTwpPsxAUJLDjZVlwW1O07VozqSjrlNg';
 // Short Google Maps links (maps.app.goo.gl) only reveal their place by redirecting, which browsers hide from pages.
 // A tiny helper (see resolver.gs) follows the redirect server-side and returns the full link. Paste its URL in trip settings, or set it here.
 const RESOLVER_LS = 'bookshelf-of-memories/resolver-url';
-const DEFAULT_RESOLVER_URL = 'https://script.google.com/macros/s/AKfycbxfnJHd-eD2FWTsFG7pZN8x8WTUMUiu9wpz5vS07tqLkxuOvKa2iePyoN2RhHc_PKoj/exec';
+const DEFAULT_RESOLVER_URL = 'https://script.google.com/macros/s/AKfycbwK7MHxy81cDs-gsnOP7Wj7Hhq-Vuq8zQihxpsfjDusUmw1lXWBCUXIqcHZn7SMRyHW/exec';
 
 /* ================= storage backends ================= */
 class LocalStore {
@@ -726,7 +726,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-07.33'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-07.34'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -809,13 +809,13 @@ class ScriptStore {
     return j;
   }
   async putImage(im, onProgress) {
-    const PIECE = 48000, data = im.data, n = Math.ceil(data.length / PIECE);
+    const PIECE = 64000, data = im.data, n = Math.ceil(data.length / PIECE);
     const uploadId = uid() + uid();
     let done = 0;
     const send = async i => { await this.post({ op: 'putChunk', uploadId, i, n, chunk: data.slice(i * PIECE, (i + 1) * PIECE) }); done += 1; onProgress && onProgress(done, n); };
     // three pieces in flight at a time
     const queue = [...Array(n).keys()];
-    await Promise.all([0, 1, 2].map(async () => { while (queue.length) await send(queue.shift()); }));
+    await Promise.all([0, 1, 2, 3].map(async () => { while (queue.length) await send(queue.shift()); }));
     const j = await this.post({ op: 'putImage', uploadId, n, name: im.name });
     if (!j.fileId) throw new Error('The helper did not keep the picture.');
     return j.fileId;
@@ -2182,7 +2182,7 @@ function closeEditor() {
    and the artifact the picture rides inside the card. If the helper does not answer, the picture
    stays on this device and the panel says so. */
 const IMG_LS = 'bookshelf-of-memories/images';
-const MAX_IMG_SIDE = 1280, IMG_QUALITY = 0.7, MAX_IMAGES = 24;
+const MAX_IMG_SIDE = 2400, IMG_QUALITY = 0.92, MAX_IMAGES = 24; // only for a picture kept on the device, which must fit the browser's few megabytes
 /* Drive serves a shared picture from several addresses, and which one answers has varied over
    the years, so a picture tries them in turn until one loads. */
 const driveUrls = (fileId, w) => { const id = encodeURIComponent(fileId); return [
@@ -2191,7 +2191,7 @@ const driveUrls = (fileId, w) => { const id = encodeURIComponent(fileId); return
   `https://drive.google.com/uc?export=view&id=${id}`,
 ]; };
 const imgSrc = im => im.fileId ? driveUrls(im.fileId, 800)[0] : im.data;
-const imgFull = im => im.fileId ? driveUrls(im.fileId, 2000)[0] : im.data;
+const imgFull = im => im.fileId ? driveUrls(im.fileId, 2400)[0] : im.data;
 function fallbackOnError(img, im, w) {
   if (!im.fileId) return;
   const urls = driveUrls(im.fileId, w); let i = 0;
@@ -2210,8 +2210,18 @@ function removeImage(ev, im) {
   }
   renderEditor(); renderAll();
 }
-/* Photographs come off a phone far larger than a card needs, so each one is redrawn to a
-   sensible size before it is kept. */
+/* A picture bound for Drive is sent exactly as it came off the camera: nothing resized or
+   re-encoded, whatever the format. Drive draws the sizes the board shows. */
+function readOriginal(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve({ id: uid(), name: file.name || 'photo', at: Date.now(), data: String(r.result) });
+    r.onerror = () => reject(new Error('could not read the file'));
+    r.readAsDataURL(file);
+  });
+}
+/* A picture kept on the device has to fit the browser's storage, so that one is redrawn,
+   large and at high quality, before it is kept. */
 function shrinkImage(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file), img = new Image();
@@ -2241,15 +2251,16 @@ async function addImages(ev, files) {
   let helperDown = false;
   S.imgNote = pics.length ? 'Sending…' : ''; renderEditor();
   for (const f of pics.slice(0, room)) {
-    let im; try { im = await shrinkImage(f); } catch (e) { console.warn(e); continue; }
     if (viaDrive() && !helperDown) {
       try {
+        const im = await readOriginal(f);
         const say = (d, n) => { S.imgNote = n > 1 ? `Sending… ${d} of ${n}` : 'Sending…'; const note = $('#editor .img-note'); if (note) note.textContent = S.imgNote; };
         const fileId = await S.store.putImage(im, say);
-        travel.push({ id: im.id, name: im.name, w: im.w, h: im.h, at: im.at, fileId }); continue;
+        travel.push({ id: im.id, name: im.name, at: im.at, bytes: f.size, fileId }); continue;
       }
       catch (e) { console.warn('picture stayed on the device', e); helperDown = (e && e.message) || true; }
     }
+    let im; try { im = await shrinkImage(f); } catch (e) { console.warn(e); continue; }
     if (viaDrive()) local.push(im); else travel.push(im);
   }
   if (travel.length) patchEvent(ev.id, { images: [...(S.events[ev.id].images || []), ...travel] }, { immediate: true });
@@ -2259,7 +2270,7 @@ async function addImages(ev, files) {
   renderEditor(); renderAll();
 }
 function lightbox(im) {
-  const big = el('img', { src: imgFull(im), alt: im.name, referrerpolicy: 'no-referrer' }); fallbackOnError(big, im, 2000);
+  const big = el('img', { src: imgFull(im), alt: im.name, referrerpolicy: 'no-referrer' }); fallbackOnError(big, im, 2400);
   const box = el('div', { class: 'lightbox', onclick: () => box.remove() }, big);
   document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { box.remove(); document.removeEventListener('keydown', esc); } });
   document.body.append(box);

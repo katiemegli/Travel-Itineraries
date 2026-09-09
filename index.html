@@ -177,10 +177,10 @@ body[data-theme="ink"] .top{background:#D1CCC5;border-bottom:1px solid rgba(42,4
 /* A paper band across the top of the hero; the wash begins beneath it. The trip's name sits on the band's edge, half on each side. */
 body[data-theme="ink"]{--band:clamp(120px,18vh,200px);--name:clamp(36px,5.4vw,78px);--name-gap:22px}
 body[data-theme="ink"] .top::before{content:"";display:block;position:absolute;top:0;left:0;right:0;height:var(--band);background:#F4F2EC;background-image:none;opacity:1;z-index:1;pointer-events:none}
-body[data-theme="ink"] .hero-pad{padding-top:calc(var(--band) + var(--nh, var(--name)) / 2 + var(--name-gap))}
+body[data-theme="ink"] .hero-pad{padding-top:calc(var(--band) + var(--nh, var(--name)) - var(--name) * .575 + var(--name-gap))}
 body[data-theme="ink"] .trip-header > .trip-sub:first-child{margin-top:0}
-body[data-theme="ink"] .trip-name.hero-band-name{position:absolute;top:calc(var(--band) - var(--nh, var(--name)) / 2);left:var(--sp-lg);right:var(--sp-lg);margin:0;z-index:2;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:300 var(--name)/1.15 var(--script);letter-spacing:.06em;text-shadow:none;cursor:pointer}
-body[data-theme="ink"] .hero-band-kicker{position:absolute;left:0;right:0;bottom:calc(100% - var(--band) + var(--nh, var(--name)) / 2 + var(--name-gap));margin:0;z-index:2;text-align:center;opacity:1;color:var(--muted)}
+body[data-theme="ink"] .trip-name.hero-band-name{position:absolute;top:calc(var(--band) - var(--name) * .575);left:var(--sp-lg);right:var(--sp-lg);margin:0;z-index:2;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:300 var(--name)/1.15 var(--script);letter-spacing:.06em;text-shadow:none;cursor:pointer}
+body[data-theme="ink"] .hero-band-kicker{position:absolute;left:0;right:0;bottom:calc(100% - var(--band) + var(--name) * .575 + var(--name-gap));margin:0;z-index:2;text-align:center;opacity:1;color:var(--muted)}
 body[data-theme="ink"].hero-collapsed .hero-band-kicker{opacity:0}
 body[data-theme="ink"] .hero-band-name.cjk{font-family:var(--mincho);font-weight:700;letter-spacing:.35em;text-indent:.35em}
 body[data-theme="ink"].hero-collapsed .hero-band-name{opacity:0}
@@ -798,7 +798,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.18'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.19'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -1984,7 +1984,7 @@ function renderTop() {
   const onBand = !!(t && t.theme === 'ink'); // the ink skin hangs the name on the paper band's edge
   const cjk = /[\u3000-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(name);
   const lines = cjk ? name.split(/\s*\/\s*|\n/).flatMap(x => { const m = x.match(/^(.+?に)(.+)$/); return m ? [m[1], m[2]] : [x]; }).filter(Boolean).slice(0, 2) : [name];
-  top.style.setProperty('--nh', lines.length > 1 ? `calc(var(--name) * ${1.15 * lines.length})` : 'var(--name)');
+  top.style.setProperty('--nh', `calc(var(--name) * ${1.15 * lines.length})`); // the block's height; its first line is centred on the band's edge
   top.append(
     el('div', { class: 'top-row' },
       el('button', { class: 'trip-btn', onclick: e => tripMenu(e.currentTarget), 'aria-label': 'Switch trip' }, 'Trips'),

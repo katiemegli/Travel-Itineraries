@@ -726,7 +726,8 @@ const TIME_H = 325;
 const WALK_MAX = 35, TRANSIT_MAX = 45; // minutes: walk under 35, subway under 45, otherwise car
 const WALK_NO_CAR = 25;                 // a walk under 25 minutes hides the car option altogether
 const WALK_SHOW_MAX = 90;               // nobody is walking longer than this, so it stops being offered
-const AUTO_V = 4;                       // bump when the row rules change so stored rows are recomputed
+const TRANSIT_SHOW_MAX = 120;           // the subway is offered whenever the ride is under two hours
+const AUTO_V = 5;                       // bump when the row rules change so stored rows are recomputed
 // List order doubles as the sort order for cards without a time.
 const DEFAULT_CATEGORIES = [
   { id: 'lunch',    name: 'Lunch',        emoji: '🥪', h: 40,  autoTime: '12:00', sortTime: '12:00' },
@@ -791,7 +792,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.12'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.13'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -1860,11 +1861,11 @@ async function duration(a, b, mode) {
 const withAlts = (primary, all) => { // the chosen way first, then the rest; a short walk drops the car, a very long one drops itself
   const walk = all.find(x => x && x.mode === 'walk');
   const shortWalk = walk && walk.mins < WALK_NO_CAR;
-  const drop = x => (shortWalk && x.mode === 'drive') || (x.mode === 'walk' && x.mins > WALK_SHOW_MAX);
+  const drop = x => (shortWalk && x.mode === 'drive') || (x.mode === 'walk' && x.mins > WALK_SHOW_MAX) || (x.mode === 'subway' && x.mins >= TRANSIT_SHOW_MAX);
   return { ...primary, v: AUTO_V, alts: all.filter(x => x && x.mode !== primary.mode && !drop(x)) };
 };
 async function googlePair(a, b) {
-  // Walk under 35, else subway under 45, else car. Every option Google returns is shown.
+  // Walk under 35, else subway under 45, else car. Every option Google returns is shown; the subway whenever it is under two hours.
   const walk = await duration(a, b, 'WALKING');
   const transit = await duration(a, b, 'TRANSIT');
   const drive = await duration(a, b, 'DRIVING');

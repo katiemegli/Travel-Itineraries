@@ -791,7 +791,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.9'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.10'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -2668,8 +2668,10 @@ function renderEditor() {
     [1, 2, 3, 4, 5].map(n => el('button', { class: n <= ev.rating ? 'on' : '', 'aria-label': `${n} star${n > 1 ? 's' : ''}`, onclick: () => patchEvent(ev.id, { rating: ev.rating === n ? 0 : n }, { immediate: true }) }, '★')),
     ev.rating ? el('button', { class: 'clear', onclick: () => patchEvent(ev.id, { rating: 0 }, { immediate: true }) }, 'Clear') : null);
 
-  const date = el('input', { type: 'date', value: ev.date, onchange: e => { const v = e.target.value; patchEvent(ev.id, { date: v }, { immediate: true }); if (v && !t.days.includes(v)) addDay(t, v); } });
-  const time = el('input', { type: 'time', value: ev.time, onchange: e => patchEvent(ev.id, { time: e.target.value }, { immediate: true }) });
+  /* Pickers fire a change on every wheel tick, so nothing redraws while one is open; the card settles when the field is left. */
+  const settle = () => { flushEvent(ev.id); const cur = S.events[ev.id]; if (cur && cur.date && !t.days.includes(cur.date)) addDay(t, cur.date); if (cur && JSON.stringify(cur) !== editorRendered) renderEditor(); };
+  const date = el('input', { type: 'date', value: ev.date, onchange: e => patchEvent(ev.id, { date: e.target.value }), onblur: settle });
+  const time = el('input', { type: 'time', value: ev.time, onchange: e => patchEvent(ev.id, { time: e.target.value }), onblur: settle });
 
   // Transportation: automatic from directions, with a manual override.
   const tr = ev.transport || { mins: null, mode: '' };
@@ -2855,8 +2857,8 @@ function settingsDialog() {
   const renderStays = () => {
     stays.replaceChildren(...t.stays.map(s => el('div', { class: 'stayrow' },
       el('input', { value: s.city, placeholder: 'City', 'aria-label': 'City', oninput: e => { s.city = e.target.value.trim(); applyStays(t); save(); } }),
-      el('input', { type: 'date', value: s.from, 'aria-label': 'First day', onchange: e => { s.from = e.target.value; if (!s.to || s.to < s.from) s.to = s.from; applyStays(t); save(); renderStays(); } }),
-      el('input', { type: 'date', value: s.to, 'aria-label': 'Last day', onchange: e => { s.to = e.target.value; if (s.from && s.to < s.from) s.from = s.to; applyStays(t); save(); renderStays(); } }),
+      el('input', { type: 'date', value: s.from, 'aria-label': 'First day', onchange: e => { s.from = e.target.value; if (!s.to || s.to < s.from) s.to = s.from; applyStays(t); save(); }, onblur: renderStays }),
+      el('input', { type: 'date', value: s.to, 'aria-label': 'Last day', onchange: e => { s.to = e.target.value; if (s.from && s.to < s.from) s.from = s.to; applyStays(t); save(); }, onblur: renderStays }),
       el('button', { class: 'del', 'aria-label': `Remove ${s.city || 'stay'}`, onclick: () => { t.stays = t.stays.filter(x => x !== s); save(); renderStays(); } }, icon('x')))));
   };
   renderStays();
@@ -2872,8 +2874,8 @@ function settingsDialog() {
     hotels.replaceChildren(...(t.hotels || []).map(h => el('div', { class: 'hotelrow' },
       el('div', { class: 'stayrow', style: 'grid-template-columns:1.6fr 1fr 1fr 36px' },
         el('input', { value: h.name, placeholder: 'Hotel name', 'aria-label': 'Hotel', oninput: e => { h.name = e.target.value.trim(); h.place = null; h.tried = ''; save(); } }),
-        el('input', { type: 'date', value: h.from, 'aria-label': 'First morning', onchange: e => { h.from = e.target.value; if (!h.to || h.to < h.from) h.to = h.from; save(); renderHotels(); } }),
-        el('input', { type: 'date', value: h.to, 'aria-label': 'Last morning', onchange: e => { h.to = e.target.value; if (h.from && h.to < h.from) h.from = h.to; save(); renderHotels(); } }),
+        el('input', { type: 'date', value: h.from, 'aria-label': 'First morning', onchange: e => { h.from = e.target.value; if (!h.to || h.to < h.from) h.to = h.from; save(); }, onblur: renderHotels }),
+        el('input', { type: 'date', value: h.to, 'aria-label': 'Last morning', onchange: e => { h.to = e.target.value; if (h.from && h.to < h.from) h.from = h.to; save(); }, onblur: renderHotels }),
         el('button', { class: 'del', 'aria-label': `Remove ${h.name || 'hotel'}`, onclick: () => { t.hotels = t.hotels.filter(x => x !== h); save(); renderHotels(); } }, icon('x'))),
       el('span', { class: 'hint' }, h.place && h.place.address ? '📍 ' + h.place.address : (h.name ? 'Pin will be looked up on Google Maps.' : '')))));
   };

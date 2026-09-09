@@ -186,7 +186,7 @@ body[data-theme="ink"] .hero-band-name.cjk{font-family:var(--mincho);font-weight
 body[data-theme="ink"].hero-collapsed .hero-band-name{opacity:0}
 @media (max-width:720px){
   body[data-theme="ink"]{--band:clamp(96px,14vh,140px)}
-  body[data-theme="ink"]{--name:32px;--name-gap:16px}
+  body[data-theme="ink"]{--name:42px;--name-gap:16px}
   body[data-theme="ink"] .hero-band-name{left:var(--sp-md);right:var(--sp-md)}
   body[data-theme="ink"] .hero-band-name.cjk{letter-spacing:.2em;text-indent:.2em}
 }
@@ -798,7 +798,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.20'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.21'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

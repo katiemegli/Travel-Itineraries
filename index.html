@@ -773,7 +773,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-08.1'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.1'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -2696,8 +2696,12 @@ function menu(anchor, items) {
   }
   placePop(pop, anchor);
 }
+/* The Trips list: pinned names first, then oldest first. */
+const TRIP_PINNED = [/tokyo.*jan/i];
+function tripRank(t) { const i = TRIP_PINNED.findIndex(r => r.test(t.name || '')); return i < 0 ? TRIP_PINNED.length : i; }
+function tripsInOrder() { return Object.values(S.trips).sort((a, b) => tripRank(a) - tripRank(b) || a.createdAt - b.createdAt); }
 function tripMenu(anchor) {
-  const trips = Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt);
+  const trips = tripsInOrder();
   menu(anchor, [
     { label: 'Trips' },
     ...trips.map(t => ({ label: t.name || 'Untitled trip', checked: t.id === S.tripId, onclick: () => selectTrip(t.id) })),
@@ -2874,7 +2878,7 @@ function settingsDialog() {
       el('button', { class: 'btn danger', style: 'margin-right:auto', onclick: () => {
         if (confirm(`Delete the trip “${t.name}” and all of its cards? This cannot be undone.`)) {
           d.close(); const id = t.id; delete S.trips[id]; delete S.pendingTrip[id];
-          const next = Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt)[0];
+          const next = tripsInOrder()[0];
           selectTrip(next ? next.id : null);
           track(Promise.resolve(S.store.deleteTrip(id))); renderAll();
         } } }, icon('trash'), 'Delete trip'),
@@ -2968,11 +2972,11 @@ async function boot() {
       }
       seedLondonTrip();
       const last = LS.get('bookshelf-of-memories/last-trip');
-      const pick = S.trips[last] ? last : (Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt)[0] || {}).id || null;
+      const pick = S.trips[last] ? last : (tripsInOrder()[0] || {}).id || null;
       selectTrip(pick);
       if (!LS.get(TUTORIAL_LS)) setTimeout(tutorialDialog, 600);
     } else if (S.tripId && !S.trips[S.tripId]) {
-      const nxt = Object.values(S.trips).sort((a, b) => a.createdAt - b.createdAt)[0];
+      const nxt = tripsInOrder()[0];
       selectTrip(nxt ? nxt.id : null);
     }
     for (const id in S.events) normalizeEvent(S.events[id], trip());

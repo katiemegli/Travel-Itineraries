@@ -791,7 +791,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.7'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.8'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -1131,6 +1131,22 @@ function fixHotels() {
 }
 /* Which board wears which skin. Matched on the trip's name, so a board made on any
    device is dressed too, and only once: changing a skin afterwards sticks. */
+/* One-time date moves for a whole trip: days, stays, hotels and every card. Remembered on the trip so later hand edits stick. */
+const DATE_SHIFTS = [
+  { key: 'jan-2027', trip: /tokyo.*jan|東京/i, from: '2026-', to: '2027-' },
+];
+function shiftDates() {
+  const t = trip(); if (!t) return;
+  for (const f of DATE_SHIFTS) {
+    if (!f.trip.test(t.name || '') || (t.fixes && t.fixes[f.key])) continue;
+    const mv = d => typeof d === 'string' && d.startsWith(f.from) ? f.to + d.slice(f.from.length) : d;
+    t.days = [...new Set((t.days || []).map(mv))].sort();
+    for (const st of t.stays || []) { st.from = mv(st.from); st.to = mv(st.to); }
+    for (const h of t.hotels || []) { h.from = mv(h.from); h.to = mv(h.to); }
+    for (const ev of Object.values(S.events)) if (ev.date && mv(ev.date) !== ev.date) patchEvent(ev.id, { date: mv(ev.date) }, { immediate: true });
+    t.fixes = { ...(t.fixes || {}), [f.key]: 1 }; saveTrip(t);
+  }
+}
 const TRIP_SKINS = [
   { match: t => t.id === LONDON_ID || /^london/i.test(t.name || ''), theme: 'mono' },
   { match: t => /^tampa\b/i.test((t.name || '').trim()), theme: 'undertone' },
@@ -1494,7 +1510,7 @@ function selectTrip(id) {
     for (const e of list) next[e.id] = S.pending[e.id] || normalizeEvent(e, t);
     for (const pid in S.pending) if (!next[pid] && S.pending[pid]) next[pid] = S.pending[pid];
     S.events = next;
-    migrateLondonTrip(); fixStayOrder(); seedHotels(); seedItinerary(); dropSeedDuplicates(); themeLondonTrip(); fixHotels();
+    migrateLondonTrip(); fixStayOrder(); seedHotels(); seedItinerary(); dropSeedDuplicates(); themeLondonTrip(); fixHotels(); shiftDates();
     renderAll(); refreshEditor();
   }, e => { S.lastError = 'Lost connection to shared trip'; setStatus(); });
   renderAll();

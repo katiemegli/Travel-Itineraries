@@ -732,7 +732,7 @@ const WALK_MAX = 35, TRANSIT_MAX = 45; // minutes: walk under 35, subway under 4
 const WALK_NO_CAR = 25;                 // a walk under 25 minutes hides the car option altogether
 const WALK_SHOW_MAX = 90;               // nobody is walking longer than this, so it stops being offered
 const TRANSIT_SHOW_MAX = 120;           // the subway is offered whenever the ride is under two hours
-const AUTO_V = 5;                       // bump when the row rules change so stored rows are recomputed
+const AUTO_V = 6;                       // bump when the row rules change so stored rows are recomputed
 // List order doubles as the sort order for cards without a time.
 const DEFAULT_CATEGORIES = [
   { id: 'lunch',    name: 'Lunch',        emoji: '🥪', h: 40,  autoTime: '12:00', sortTime: '12:00' },
@@ -797,7 +797,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.15'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.17'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -1932,15 +1932,18 @@ async function updateAutoTransport() {
         if (S.autoDone[key] >= available && b.auto && b.auto.key === key) continue; // already computed this session: never flip back and forth
         const from = a.hotel ? 'hotel' : 'card';
         const metres = haversine(a.place, b.place);
-        if (metres > 300000 || metres < 80) { // another city, or the same doorstep: no leg worth showing
+        if (metres > 300000) { // another city: no leg worth showing
           if (!b.auto || b.auto.key !== key || !b.auto.none) patchEvent(b.id, { auto: { key, none: true, v: AUTO_V, rank: available, from, at: Date.now() } }, { immediate: true });
           S.autoDone[key] = available; continue;
         }
         let r = null;
-        if (mapsReady()) { try { r = await googlePair(a, b); } catch (e) { console.warn(e); } }
-        if (r) r.rank = 2;
-        if (!r && osmOk()) { try { r = await osmPair(a, b); } catch (e) { console.warn(e); } if (r) r.rank = 1; }
-        if (!r) r = { ...estimatePair(a, b), rank: 0 };
+        if (metres < 80) r = { mode: 'walk', mins: 1, v: AUTO_V, alts: [], rank: available }; // the same doorstep: a minute's walk
+        else {
+          if (mapsReady()) { try { r = await googlePair(a, b); } catch (e) { console.warn(e); } }
+          if (r) r.rank = 2;
+          if (!r && osmOk()) { try { r = await osmPair(a, b); } catch (e) { console.warn(e); } if (r) r.rank = 1; }
+          if (!r) r = { ...estimatePair(a, b), rank: 0 };
+        }
         S.autoDone[key] = r.rank;
         if (b.auto && b.auto.key === key && b.auto.rank === r.rank && b.auto.mode === r.mode && b.auto.mins === r.mins) continue;
         if (b.auto && b.auto.key === key && (b.auto.rank || 0) > r.rank) continue; // someone else computed it with better data: keep theirs
@@ -2466,7 +2469,18 @@ function openEditor(id, opts = {}) {
   if (opts.focus === 'transport') setTimeout(() => { const f = $('#f-transport', ed); f && f.scrollIntoView({ block: 'center' }); }, 30);
   if (opts.focus === 'place') setTimeout(() => { const f = $('#f-place input', ed); f && f.focus(); }, 30);
 }
+/* A date or time picker in use: the editor (or settings list) is left alone until the next tap elsewhere, then it settles. */
+function pickSettle() {
+  const pk = S.pick; if (!pk) return; S.pick = null;
+  if (pk.after) { pk.after(); return; }
+  flushEvent(pk.id);
+  const t = trip(), cur = S.events[pk.id];
+  if (t && cur && cur.date && !t.days.includes(cur.date)) addDay(t, cur.date);
+  if (S.editingId === pk.id && cur && JSON.stringify(cur) !== editorRendered) renderEditor();
+}
+document.addEventListener('pointerdown', e => { const el = e.target; if (S.pick && !(el && el.matches && el.matches('input[type="date"],input[type="time"]'))) pickSettle(); }, true);
 function closeEditor() {
+  pickSettle();
   const id = S.editingId;
   if (id && S.draftId === id) { const ev = S.events[id]; if (ev && !ev.title.trim() && !ev.place) { S.editingId = null; S.draftId = null; deleteEvent(id); } }
   if (S.draftId === id) S.draftId = null;
@@ -2631,7 +2645,7 @@ function linksPanel(ev) {
   return el('div', {}, ...rows);
 }
 function refreshEditor() {
-  if (!S.editingId) return;
+  if (!S.editingId || S.pick) return;
   const ev = S.events[S.editingId];
   if (!ev) { closeEditor(); return; }
   if (JSON.stringify(ev) === editorRendered) return;
@@ -2690,10 +2704,11 @@ function renderEditor() {
     [1, 2, 3, 4, 5].map(n => el('button', { class: n <= ev.rating ? 'on' : '', 'aria-label': `${n} star${n > 1 ? 's' : ''}`, onclick: () => patchEvent(ev.id, { rating: ev.rating === n ? 0 : n }, { immediate: true }) }, '★')),
     ev.rating ? el('button', { class: 'clear', onclick: () => patchEvent(ev.id, { rating: 0 }, { immediate: true }) }, 'Clear') : null);
 
-  /* Pickers fire a change on every wheel tick, so nothing redraws while one is open; the card settles when the field is left. */
-  const settle = () => { flushEvent(ev.id); const cur = S.events[ev.id]; if (cur && cur.date && !t.days.includes(cur.date)) addDay(t, cur.date); if (cur && JSON.stringify(cur) !== editorRendered) renderEditor(); };
-  const date = el('input', { type: 'date', value: ev.date, onchange: e => patchEvent(ev.id, { date: e.target.value }), onblur: settle });
-  const time = el('input', { type: 'time', value: ev.time, onchange: e => patchEvent(ev.id, { time: e.target.value }), onblur: settle });
+  /* Native pickers fire a change on every wheel tick, and on iOS the field can even blur while the picker is still up.
+     So while a picker is in use the editor is frozen: nothing redraws until the next tap somewhere else (see pickSettle). */
+  const picking = () => { S.pick = { id: ev.id, tripId: t.id }; };
+  const date = el('input', { type: 'date', value: ev.date, onfocus: picking, onpointerdown: picking, onchange: e => { picking(); patchEvent(ev.id, { date: e.target.value }); } });
+  const time = el('input', { type: 'time', value: ev.time, onfocus: picking, onpointerdown: picking, onchange: e => { picking(); patchEvent(ev.id, { time: e.target.value }); } });
 
   // Transportation: automatic from directions, with a manual override.
   const tr = ev.transport || { mins: null, mode: '' };
@@ -2879,8 +2894,8 @@ function settingsDialog() {
   const renderStays = () => {
     stays.replaceChildren(...t.stays.map(s => el('div', { class: 'stayrow' },
       el('input', { value: s.city, placeholder: 'City', 'aria-label': 'City', oninput: e => { s.city = e.target.value.trim(); applyStays(t); save(); } }),
-      el('input', { type: 'date', value: s.from, 'aria-label': 'First day', onchange: e => { s.from = e.target.value; if (!s.to || s.to < s.from) s.to = s.from; applyStays(t); save(); }, onblur: renderStays }),
-      el('input', { type: 'date', value: s.to, 'aria-label': 'Last day', onchange: e => { s.to = e.target.value; if (s.from && s.to < s.from) s.from = s.to; applyStays(t); save(); }, onblur: renderStays }),
+      el('input', { type: 'date', value: s.from, 'aria-label': 'First day', onfocus: () => { S.pick = { after: renderStays }; }, onchange: e => { S.pick = { after: renderStays }; s.from = e.target.value; if (!s.to || s.to < s.from) s.to = s.from; applyStays(t); save(); } }),
+      el('input', { type: 'date', value: s.to, 'aria-label': 'Last day', onfocus: () => { S.pick = { after: renderStays }; }, onchange: e => { S.pick = { after: renderStays }; s.to = e.target.value; if (s.from && s.to < s.from) s.from = s.to; applyStays(t); save(); } }),
       el('button', { class: 'del', 'aria-label': `Remove ${s.city || 'stay'}`, onclick: () => { t.stays = t.stays.filter(x => x !== s); save(); renderStays(); } }, icon('x')))));
   };
   renderStays();
@@ -2896,8 +2911,8 @@ function settingsDialog() {
     hotels.replaceChildren(...(t.hotels || []).map(h => el('div', { class: 'hotelrow' },
       el('div', { class: 'stayrow', style: 'grid-template-columns:1.6fr 1fr 1fr 36px' },
         el('input', { value: h.name, placeholder: 'Hotel name', 'aria-label': 'Hotel', oninput: e => { h.name = e.target.value.trim(); h.place = null; h.tried = ''; save(); } }),
-        el('input', { type: 'date', value: h.from, 'aria-label': 'First morning', onchange: e => { h.from = e.target.value; if (!h.to || h.to < h.from) h.to = h.from; save(); }, onblur: renderHotels }),
-        el('input', { type: 'date', value: h.to, 'aria-label': 'Last morning', onchange: e => { h.to = e.target.value; if (h.from && h.to < h.from) h.from = h.to; save(); }, onblur: renderHotels }),
+        el('input', { type: 'date', value: h.from, 'aria-label': 'First morning', onfocus: () => { S.pick = { after: renderHotels }; }, onchange: e => { S.pick = { after: renderHotels }; h.from = e.target.value; if (!h.to || h.to < h.from) h.to = h.from; save(); } }),
+        el('input', { type: 'date', value: h.to, 'aria-label': 'Last morning', onfocus: () => { S.pick = { after: renderHotels }; }, onchange: e => { S.pick = { after: renderHotels }; h.to = e.target.value; if (h.from && h.to < h.from) h.from = h.to; save(); } }),
         el('button', { class: 'del', 'aria-label': `Remove ${h.name || 'hotel'}`, onclick: () => { t.hotels = t.hotels.filter(x => x !== h); save(); renderHotels(); } }, icon('x'))),
       el('span', { class: 'hint' }, h.place && h.place.address ? '📍 ' + h.place.address : (h.name ? 'Pin will be looked up on Google Maps.' : '')))));
   };

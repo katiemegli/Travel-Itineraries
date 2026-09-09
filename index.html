@@ -792,7 +792,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.13'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.14'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -1892,12 +1892,23 @@ async function autoLocate(ev, t) {
   catch (e) { console.warn(e); return; } // leave untried so it retries after a transient failure
   patchEvent(ev.id, { located: { v: 1, at: Date.now(), ok: !!place }, ...(place ? { place } : {}) }, { immediate: true });
 }
+/* A pinned place with no id or address cannot be named to Maps reliably: fill it in from the pin, once. */
+async function completePlace(ev) {
+  const p = ev.place; if (!mapsReady() || !p || typeof p.lat !== 'number' || p.placeId || p.filled) return;
+  const place = { ...p, filled: 1 };
+  try {
+    const near = await nearbyPlace(p.lat, p.lng);
+    if (near && (!p.name || looksLike(p.name, near.name))) { place.placeId = near.placeId; place.address = place.address || near.address; if (!place.name) place.name = near.name; }
+    if (!place.address) place.address = await reverseAddress(p.lat, p.lng);
+  } catch (e) { console.warn(e); return; }
+  patchEvent(ev.id, { place }, { immediate: true });
+}
 async function updateAutoTransport() {
   if (S.autoBusy) { S.autoAgain = true; return; }
   S.autoBusy = true;
   try {
     const t = trip(); if (!t) return;
-    if (mapsReady()) for (const ev of Object.values(S.events)) if (!ev.archived) await autoLocate(ev, t);
+    if (mapsReady()) for (const ev of Object.values(S.events)) if (!ev.archived) { await autoLocate(ev, t); await completePlace(S.events[ev.id] || ev); }
     await locateHotels(t);
     for (const date of [...t.days, '']) {
       const evs = dayEvents(date, { all: true });
@@ -1944,7 +1955,7 @@ const effectiveTransport = ev => {
 const DIR_MODE = { walk: 'walking', bike: 'bicycling', drive: 'driving', taxi: 'driving', tuktuk: 'driving' };
 /* Directions are asked for by name and address, so Maps shows the places rather than pins; the place id, when known, keeps it exact. */
 const placeQuery = p => { const n = String(p.name || '').trim(), a = String(p.address || '').trim(); return !n ? a : !a || a.toLowerCase().startsWith(n.toLowerCase()) ? (a || n) : n + ', ' + a; };
-const dirEnd = (p, k) => { const q = placeQuery(p); return `${k}=${encodeURIComponent(q || `${p.lat},${p.lng}`)}` + (p.placeId ? `&${k}_place_id=${encodeURIComponent(p.placeId)}` : ''); };
+const dirEnd = (p, k) => { const q = p.placeId || p.address ? placeQuery(p) : ''; return `${k}=${encodeURIComponent(q || `${p.lat},${p.lng}`)}` + (p.placeId ? `&${k}_place_id=${encodeURIComponent(p.placeId)}` : ''); }; // a bare name is too vague to send
 const directionsUrl = (a, b, mode) => hasCoords(a) && hasCoords(b)
   ? `https://www.google.com/maps/dir/?api=1&${dirEnd(a.place, 'origin')}&${dirEnd(b.place, 'destination')}&travelmode=${DIR_MODE[mode] || 'transit'}` : '';
 

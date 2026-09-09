@@ -182,7 +182,7 @@ body[data-theme="ink"] .trip-header > .trip-sub:first-child{margin-top:0}
 body[data-theme="ink"] .trip-name.hero-band-name{position:absolute;top:calc(var(--band) - var(--name) * .575);left:var(--sp-lg);right:var(--sp-lg);margin:0;z-index:2;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:300 var(--name)/1.15 var(--script);letter-spacing:.06em;text-shadow:none;cursor:pointer}
 body[data-theme="ink"] .hero-band-kicker{position:absolute;left:0;right:0;bottom:calc(100% - var(--band) + var(--name) * .575 + var(--name-gap));margin:0;z-index:2;text-align:center;opacity:1;color:var(--muted)}
 body[data-theme="ink"].hero-collapsed .hero-band-kicker{opacity:0}
-body[data-theme="ink"] .hero-band-name.cjk{font-family:var(--mincho);font-weight:700;letter-spacing:.35em;text-indent:.35em}
+body[data-theme="ink"] .hero-band-name.cjk{font-family:var(--mincho);font-weight:300;letter-spacing:.35em;text-indent:.35em}
 body[data-theme="ink"].hero-collapsed .hero-band-name{opacity:0}
 @media (max-width:720px){
   body[data-theme="ink"]{--band:clamp(96px,14vh,140px)}
@@ -201,7 +201,7 @@ body[data-theme="ink"] .trip-sub{font:600 italic 20px/1.4 var(--script);letter-s
 
 body[data-theme="ink"] .trip-kicker{font:400 12px/1.2 var(--mincho);letter-spacing:.3em}
 body[data-theme="ink"] .bar-title{font:300 22px/1.2 var(--script);letter-spacing:.06em}
-body[data-theme="ink"] .bar-title.cjk{font:700 18px/1.2 var(--mincho);letter-spacing:.2em}
+body[data-theme="ink"] .bar-title.cjk{font:300 18px/1.2 var(--mincho);letter-spacing:.2em}
 body[data-theme="ink"] .col-head .dow{font:300 32px/1.1 var(--script);letter-spacing:.06em}
 body[data-theme="ink"] .unsched-title{font:300 26px/1.1 var(--script);letter-spacing:.06em}
 body[data-theme="ink"] .ed-title{font:300 34px/1.1 var(--script);letter-spacing:.04em}
@@ -798,7 +798,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.19'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.20'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

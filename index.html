@@ -174,17 +174,17 @@ body[data-theme="ink"]{
   background:#F4F2EC;
 }
 body[data-theme="ink"] .top{background:#D1CCC5;border-bottom:1px solid rgba(42,41,39,.2)}
-/* A paper band across the top of the hero; the wash begins beneath it. The vertical mark starts inside the band so its first character straddles the edge. */
+/* A paper band across the top of the hero; the wash begins beneath it. A written subtitle sits on the band's edge, half on each side. */
 body[data-theme="ink"]{--band:clamp(120px,18vh,200px)}
 body[data-theme="ink"] .top::before{content:"";display:block;position:absolute;top:0;left:0;right:0;height:var(--band);background:#F4F2EC;background-image:none;opacity:1;z-index:1;pointer-events:none}
 body[data-theme="ink"] .top-row{z-index:3}
 body[data-theme="ink"] .hero-pad{padding-top:calc(var(--band) + 56px)}
-body[data-theme="ink"] .hero-mark{position:absolute;top:calc(var(--band) - .5em);right:8vw;z-index:2;writing-mode:vertical-rl;text-orientation:upright;font:300 clamp(28px,2.8vw,44px)/2 var(--mincho);letter-spacing:.8em;color:var(--ink);text-shadow:0 0 20px rgba(244,242,236,.5);pointer-events:none;user-select:none}
-body[data-theme="ink"].hero-collapsed .hero-mark{opacity:0}
+body[data-theme="ink"] .hero-band-sub{position:absolute;top:calc(var(--band) - .5em);left:0;right:0;margin:0;z-index:2;text-align:center;white-space:nowrap;font:300 clamp(30px,3.2vw,48px)/1 var(--mincho);letter-spacing:.5em;text-indent:.5em;color:var(--ink);pointer-events:none}
+body[data-theme="ink"].hero-collapsed .hero-band-sub{opacity:0}
 @media (max-width:720px){
   body[data-theme="ink"]{--band:clamp(96px,14vh,140px)}
   body[data-theme="ink"] .hero-pad{padding-top:calc(var(--band) + 40px)}
-  body[data-theme="ink"] .hero-mark{right:4vw;font-size:22px;letter-spacing:.6em}
+  body[data-theme="ink"] .hero-band-sub{font-size:24px;letter-spacing:.3em;text-indent:.3em}
 }
 body[data-theme="ink"] .hero-drawer,body[data-theme="ink"] .bar{position:relative;z-index:1}
 body[data-theme="ink"] .sheet{position:relative;background:#F2F0EB}
@@ -784,7 +784,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.2'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.3'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -1127,7 +1127,7 @@ function fixHotels() {
 const TRIP_SKINS = [
   { match: t => t.id === LONDON_ID || /^london/i.test(t.name || ''), theme: 'mono' },
   { match: t => /^tampa\b/i.test((t.name || '').trim()), theme: 'undertone' },
-  { match: t => /tokyo.*jan/i.test(t.name || ''), theme: 'ink', mark: '東京の一月' },
+  { match: t => /tokyo.*jan/i.test(t.name || ''), theme: 'ink' },
 ];
 function themeLondonTrip() {
   const t = trip(); if (!t || t.themeV) return;
@@ -1914,7 +1914,7 @@ function renderTop() {
   const name = t ? t.name : 'Bookshelf of Memories';
   const count = t ? Object.values(S.events).filter(e => !e.archived).length : 0;
   const sub = t ? (t.subtitle || [`${t.days.length} day${t.days.length === 1 ? '' : 's'}`, `${count} stop${count === 1 ? '' : 's'}`].join(' · ')) : 'Plan each day as a board of cards';
-  const skin = t && TRIP_SKINS.find(k => k.match(t)); const mark = t && t.theme === 'ink' && skin && skin.mark || '';
+  const bandSub = t && t.theme === 'ink' ? (t.subtitle || '').trim() : ''; // the ink skin sets a written subtitle on the band's edge
   top.append(
     el('div', { class: 'top-row' },
       el('button', { class: 'trip-btn', onclick: e => tripMenu(e.currentTarget), 'aria-label': 'Switch trip' }, 'Trips'),
@@ -1925,10 +1925,10 @@ function renderTop() {
       el('button', { class: 'bar-title', title: 'Trips and settings', onclick: e => tripMenu(e.currentTarget) }, name),
       el('button', { class: 'bar-chev', 'aria-label': 'Expand the header', title: 'Expand', onclick: expandHero }, icon('chev'))),
     t && el('div', { class: 'hero-drawer' }, el('div', { class: 'hero-body' }, el('div', { class: 'hero-pad' },
-      ...(mark ? [el('div', { class: 'hero-mark', 'aria-hidden': 'true', lang: 'ja' }, mark)] : []),
+      ...(bandSub ? [el('p', { class: 'hero-band-sub', lang: 'ja' }, bandSub)] : []),
       el('div', { class: 'trip-header' }, el('h2', { class: 'trip-kicker', style: 'margin:0' }, fmtRange(t.days)),
         el('h1', { class: 'trip-name', style: 'margin:0', role: 'button', tabindex: '0', title: 'Trips and settings', onclick: e => tripMenu(e.currentTarget) }, ...fancyName(name)),
-        el('p', { class: 'trip-sub', style: 'margin-bottom:0' }, sub)),
+        ...(bandSub ? [] : [el('p', { class: 'trip-sub', style: 'margin-bottom:0' }, sub)])),
       renderChecklist(t),
       el('button', { class: 'scroll-cue', 'aria-label': 'Collapse the header', onclick: collapseHero }, el('span', {}, 'To the itinerary!'), icon('arrowdown'))))));
   setStatus();

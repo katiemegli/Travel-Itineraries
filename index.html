@@ -791,7 +791,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.11'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.12'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -2178,13 +2178,15 @@ function renderLink(ev, first, prev) {
   }
   return link;
 }
+/* 45 min, 1 hr, 1 hr 20 min */
+const fmtMins = m => { m = Math.round(+m || 0); if (m < 60) return `${m} min`; const h = Math.floor(m / 60), r = m % 60; return r ? `${h} hr ${r} min` : `${h} hr`; };
 function transportChip(tr, attrs = {}, tag = 'span') {
   const m = MODES[tr.mode];
   const parts = [];
-  if (tr.mins) parts.push(`${tr.est ? '~' : ''}${tr.mins} min`);
+  if (tr.mins) parts.push(`${tr.est ? '~' : ''}${fmtMins(tr.mins)}`);
   const alts = (tr.alts || (tr.alt ? [tr.alt] : [])).filter(x => x && MODES[x.mode]);
   const opt = (icon, text, label) => el('span', { class: 'opt', title: label || '', 'aria-label': label ? `${text} ${label}` : text }, icon && el('span', { class: 'mi', 'aria-hidden': 'true' }, icon), text);
-  const rest = alts.flatMap(x => [el('span', { class: 'sep', 'aria-hidden': 'true' }, '·'), opt(MODES[x.mode].icon, `${x.mins} min`, MODES[x.mode].label)]);
+  const rest = alts.flatMap(x => [el('span', { class: 'sep', 'aria-hidden': 'true' }, '·'), opt(MODES[x.mode].icon, fmtMins(x.mins), MODES[x.mode].label)]);
   return el(tag, { class: 'chip' + (m ? ' tone' : '') + (tr.est ? ' est' : ''), style: m ? `--h:${m.h}` : '', ...attrs }, opt(m && m.icon, parts.join(' '), m && m.label), ...rest);
 }
 function renderCard(ev) {

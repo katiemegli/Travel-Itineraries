@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Geist+Mono:wght@300;400;500;700&family=Homemade+Apple&family=Inter:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600&family=Shippori+Mincho:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Geist+Mono:wght@300;400;500;700&family=Homemade+Apple&family=Inter:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600;700&family=Shippori+Mincho:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* ---------- design tokens: paper, ink, sand, sky, cream, lemon, olive, terra ---------- */
 :root{
@@ -175,21 +175,20 @@ body[data-theme="ink"]{
 }
 body[data-theme="ink"] .top{background:#D1CCC5;border-bottom:1px solid rgba(42,41,39,.2)}
 /* A paper band across the top of the hero; the wash begins beneath it. The trip's name sits on the band's edge, half on each side. */
-body[data-theme="ink"]{--band:clamp(120px,18vh,200px);--name:clamp(30px,4vw,58px)}
+body[data-theme="ink"]{--band:clamp(120px,18vh,200px);--name:clamp(36px,5.4vw,78px);--name-gap:22px}
 body[data-theme="ink"] .top::before{content:"";display:block;position:absolute;top:0;left:0;right:0;height:var(--band);background:#F4F2EC;background-image:none;opacity:1;z-index:1;pointer-events:none}
-body[data-theme="ink"] .hero-pad{padding-top:calc(var(--band) + 80px)}
+body[data-theme="ink"] .hero-pad{padding-top:calc(var(--band) + var(--name) / 2 + var(--name-gap))}
+body[data-theme="ink"] .trip-header > .trip-sub:first-child{margin-top:0}
 body[data-theme="ink"] .trip-name.hero-band-name{position:absolute;top:calc(var(--band) - .5em);left:var(--sp-lg);right:var(--sp-lg);margin:0;z-index:2;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:300 var(--name)/1 var(--script);letter-spacing:.06em;text-shadow:none;cursor:pointer}
-body[data-theme="ink"] .hero-band-kicker{position:absolute;left:0;right:0;bottom:calc(100% - var(--band) + var(--name) / 2 + 22px);margin:0;z-index:2;text-align:center;opacity:1;color:var(--muted)}
+body[data-theme="ink"] .hero-band-kicker{position:absolute;left:0;right:0;bottom:calc(100% - var(--band) + var(--name) / 2 + var(--name-gap));margin:0;z-index:2;text-align:center;opacity:1;color:var(--muted)}
 body[data-theme="ink"].hero-collapsed .hero-band-kicker{opacity:0}
 body[data-theme="ink"] .hero-band-name.cjk{font-family:var(--mincho);letter-spacing:.35em;text-indent:.35em}
 body[data-theme="ink"].hero-collapsed .hero-band-name{opacity:0}
 @media (max-width:720px){
   body[data-theme="ink"]{--band:clamp(96px,14vh,140px)}
-  body[data-theme="ink"] .hero-pad{padding-top:calc(var(--band) + 40px)}
-  body[data-theme="ink"]{--name:27px}
+  body[data-theme="ink"]{--name:32px;--name-gap:16px}
   body[data-theme="ink"] .hero-band-name{left:var(--sp-md);right:var(--sp-md)}
   body[data-theme="ink"] .hero-band-name.cjk{letter-spacing:.2em;text-indent:.2em}
-  body[data-theme="ink"] .hero-band-kicker{bottom:calc(100% - var(--band) + var(--name) / 2 + 16px)}
 }
 body[data-theme="ink"] .hero-drawer{position:relative;z-index:1}
 body[data-theme="ink"] .sheet{position:relative;background:#F2F0EB}
@@ -199,8 +198,7 @@ body[data-theme="ink"] .checklist{background:#E9E0D2;border:1px solid rgba(42,41
 /* Type: light, wide, unhurried. Small print is set in the serif with generous tracking. */
 body[data-theme="ink"] .trip-name{font:300 clamp(56px,7vw,104px)/1 var(--script);letter-spacing:.04em;text-shadow:0 0 20px rgba(244,242,236,.5)}
 body[data-theme="ink"] .trip-sub{font:600 italic 20px/1.4 var(--script);letter-spacing:.06em;color:var(--ink)}
-body[data-theme="ink"] .scroll-cue{font-weight:600;opacity:.85}
-body[data-theme="ink"] .scroll-cue svg path{stroke-width:2.6}
+
 body[data-theme="ink"] .trip-kicker{font:400 12px/1.2 var(--mincho);letter-spacing:.3em}
 body[data-theme="ink"] .bar-title{font:300 22px/1.2 var(--script);letter-spacing:.06em}
 body[data-theme="ink"] .col-head .dow{font:300 32px/1.1 var(--script);letter-spacing:.06em}
@@ -213,6 +211,8 @@ body[data-theme="ink"] .card-cat,body[data-theme="ink"] .card-foot,body[data-the
 body[data-theme="ink"] .trip-btn,body[data-theme="ink"] .filters,body[data-theme="ink"] .daynav-pick,body[data-theme="ink"] .newcard,body[data-theme="ink"] .addday-btn,body[data-theme="ink"] .btn,body[data-theme="ink"] .scroll-cue{
   font-family:var(--mincho);font-weight:400;letter-spacing:.25em}
 body[data-theme="ink"] .title{font:400 15px/1.6 var(--mincho)}
+body[data-theme="ink"] .hero-pad .scroll-cue{font-weight:700;opacity:.9;color:var(--ink)}
+body[data-theme="ink"] .scroll-cue svg path{stroke-width:2.8}
 /* A hovered word draws its own rule from the left. */
 body[data-theme="ink"] .fchip,body[data-theme="ink"] .trip-btn{border-bottom:0;position:relative}
 body[data-theme="ink"] .fchip::after,body[data-theme="ink"] .trip-btn::after{content:"";position:absolute;left:20px;right:auto;bottom:6px;width:0;height:1px;background:var(--ink);transition:width .6s cubic-bezier(.19,1,.22,1)}
@@ -791,7 +791,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.6'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.7'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

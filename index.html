@@ -791,7 +791,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.8'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.9'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -1146,6 +1146,26 @@ function shiftDates() {
     for (const ev of Object.values(S.events)) if (ev.date && mv(ev.date) !== ev.date) patchEvent(ev.id, { date: mv(ev.date) }, { immediate: true });
     t.fixes = { ...(t.fixes || {}), [f.key]: 1 }; saveTrip(t);
   }
+}
+/* Flights for the January Tokyo trip, from the ANA e-ticket. Added once per board and remembered on the trip. */
+const JAN_FLIGHTS = [
+  { date: '2027-01-16', time: '00:55', title: 'JFK \u2192 HND \u00b7 NH159', notes: { Katie: 'ANA NH159 \u00b7 JFK Terminal 7 \u00b7 Seat 31J \u00b7 Lands Haneda Jan 17, 5:25 AM \u00b7 Reservation DBYHLX' } },
+  { date: '2027-01-17', time: '05:25', title: 'Arrive at Haneda', notes: { Katie: 'NH159 lands 5:25 AM' } },
+  { date: '2027-01-24', time: '11:35', title: 'HND \u2192 JFK \u00b7 NH110', notes: { Katie: 'ANA NH110 \u00b7 Seat 31J \u00b7 Lands JFK Terminal 7 the same day, 10:30 AM \u00b7 Reservation DBYHLX' } },
+];
+function seedJanFlights() {
+  const t = trip(); if (!t || !/tokyo.*jan|東京/i.test(t.name || '') || (t.fixes && t.fixes['jan-flights'])) return;
+  const have = new Set(Object.values(S.events).map(e => seedKey(e.date, e.title)));
+  let n = 0;
+  for (const row of JAN_FLIGHTS) {
+    if (!t.days.includes(row.date)) t.days = [...t.days, row.date].sort();
+    if (have.has(seedKey(row.date, row.title))) continue;
+    const ev = { ...newEvent(row.date), title: row.title, emoji: '\u2708\ufe0f', time: row.time, resStatus: 'booked', booked: true,
+      notes: { ...row.notes }, transport: { mins: null, mode: 'flight', override: true }, order: ++n };
+    insertEvent(ev);
+  }
+  for (const st of t.stays || []) if (st.to === '2027-01-23') st.to = '2027-01-24'; // the stay runs to the flight home
+  t.fixes = { ...(t.fixes || {}), 'jan-flights': 1 }; saveTrip(t);
 }
 const TRIP_SKINS = [
   { match: t => t.id === LONDON_ID || /^london/i.test(t.name || ''), theme: 'mono' },
@@ -1510,7 +1530,7 @@ function selectTrip(id) {
     for (const e of list) next[e.id] = S.pending[e.id] || normalizeEvent(e, t);
     for (const pid in S.pending) if (!next[pid] && S.pending[pid]) next[pid] = S.pending[pid];
     S.events = next;
-    migrateLondonTrip(); fixStayOrder(); seedHotels(); seedItinerary(); dropSeedDuplicates(); themeLondonTrip(); fixHotels(); shiftDates();
+    migrateLondonTrip(); fixStayOrder(); seedHotels(); seedItinerary(); dropSeedDuplicates(); themeLondonTrip(); fixHotels(); shiftDates(); seedJanFlights();
     renderAll(); refreshEditor();
   }, e => { S.lastError = 'Lost connection to shared trip'; setStatus(); });
   renderAll();

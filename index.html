@@ -791,7 +791,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.10'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.11'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -1941,8 +1941,11 @@ const effectiveTransport = ev => {
   return auto || manual;
 };
 const DIR_MODE = { walk: 'walking', bike: 'bicycling', drive: 'driving', taxi: 'driving', tuktuk: 'driving' };
+/* Directions are asked for by name and address, so Maps shows the places rather than pins; the place id, when known, keeps it exact. */
+const placeQuery = p => { const n = String(p.name || '').trim(), a = String(p.address || '').trim(); return !n ? a : !a || a.toLowerCase().startsWith(n.toLowerCase()) ? (a || n) : n + ', ' + a; };
+const dirEnd = (p, k) => { const q = placeQuery(p); return `${k}=${encodeURIComponent(q || `${p.lat},${p.lng}`)}` + (p.placeId ? `&${k}_place_id=${encodeURIComponent(p.placeId)}` : ''); };
 const directionsUrl = (a, b, mode) => hasCoords(a) && hasCoords(b)
-  ? `https://www.google.com/maps/dir/?api=1&origin=${a.place.lat},${a.place.lng}&destination=${b.place.lat},${b.place.lng}&travelmode=${DIR_MODE[mode] || 'transit'}` : '';
+  ? `https://www.google.com/maps/dir/?api=1&${dirEnd(a.place, 'origin')}&${dirEnd(b.place, 'destination')}&travelmode=${DIR_MODE[mode] || 'transit'}` : '';
 
 /* ================= render: top ================= */
 function renderAll() { applyTheme(); renderTop(); renderFilters(); renderBoard(); }

@@ -222,7 +222,12 @@ body[data-theme="ink"] .trip-btn:hover::after{width:80%}
 /* Buttons: a hairline that fills with ink and breathes wider on hover. */
 body[data-theme="ink"] .newcard,body[data-theme="ink"] .addday-btn,body[data-theme="ink"] .btn{border:1px solid #5A5855;transition:all .6s cubic-bezier(.19,1,.22,1)}
 body[data-theme="ink"] .newcard:hover,body[data-theme="ink"] .addday-btn:hover,body[data-theme="ink"] .btn:hover{letter-spacing:.35em}
-body[data-theme="ink"] .link .chip,body[data-theme="ink"] .link .addtr{background:#F2F0EB}
+/* Transport rows: no box under the chip; the dotted rule is drawn in two segments either side of it instead. */
+body[data-theme="ink"] .link .addtr,body[data-theme="ink"] .link .chip{background:transparent}
+body[data-theme="ink"] .card:has(+ .link){background-image:none}
+body[data-theme="ink"] .link .line,body[data-theme="ink"] .link::after{background-image:var(--dotted);background-size:6px 1px;background-repeat:repeat-x;background-position:center}
+body[data-theme="ink"] .link::after{content:"";flex:1;height:20px}
+body[data-theme="ink"] .col-body>.link:first-child .line,body[data-theme="ink"] .col-body>.link:first-child::after{background-image:none}
 
 /* ---------- hero (top area) ---------- */
 .top{position:sticky;top:0;z-index:25;display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 var(--sp-lg);background:linear-gradient(135deg,#87BADB 0%,#aee1f9 50%,#FAF3E0 100%);border-bottom:1px solid var(--ink-10);overflow:hidden}
@@ -792,7 +797,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.14'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-09.15'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */

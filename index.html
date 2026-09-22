@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="color-scheme" content="light dark">
 <title>Bookshelf of Memories</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -230,6 +231,16 @@ body[data-theme="ink"] .link .line,body[data-theme="ink"] .link::after{backgroun
 body[data-theme="ink"] .link::after{content:"";flex:1;height:20px}
 body[data-theme="ink"] .col-body>.link:first-child .line,body[data-theme="ink"] .col-body>.link:first-child::after{background-image:none}
 
+/* ---------- the gate: a passphrase before anything shows ---------- */
+.gate{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:#EBE6DC;color:var(--ink);padding:24px}
+.gate form{width:min(360px,100%);display:flex;flex-direction:column;gap:18px;text-align:center}
+.gate h1{font:300 italic 40px/1.1 var(--script);margin:0}
+.gate p{font:300 13px/1.6 var(--mincho);color:var(--muted);margin:0}
+.gate input{text-align:center;font:300 18px/28px var(--mincho);letter-spacing:.1em;padding:6px 0}
+.gate .err{color:var(--terra);min-height:1.6em}
+.gate.shake form{animation:shake .4s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+body.gated #app,body.gated .editor,body.gated #backdrop{visibility:hidden}
 /* ---------- hero (top area) ---------- */
 .top{position:sticky;top:0;z-index:25;display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 var(--sp-lg);background:linear-gradient(135deg,#87BADB 0%,#aee1f9 50%,#FAF3E0 100%);border-bottom:1px solid var(--ink-10);overflow:hidden}
 .top:not(.stuck){position:relative}
@@ -798,7 +809,7 @@ class DbStore {
 
 /* Shared store on the Apps Script helper: everyone with the link sees one board. Polls for other people's changes. */
 const QUEUE_LS = 'bookshelf-of-memories/unsent';
-const BUILD = '2026-09-09.21'; // shown in trip settings, so two devices can be compared at a glance
+const BUILD = '2026-09-22.1'; // shown in trip settings, so two devices can be compared at a glance
 class ScriptStore {
   /* Every write also goes to this device, and a write the shared board refuses is kept and
      tried again, so a helper that is briefly unhappy never costs anybody their work. */
@@ -3104,7 +3115,26 @@ function retryShared(local) {
     setStatus(); renderAll();
   }, 30000);
 }
-boot();
+/* The page is shared by link only: a passphrase, remembered on the device, stands in front of it. Only a hash of it lives here. */
+const GATE_HASH = 'bea19a296124816115d110b1cdace88689e56449548f1e9347dcd34ffcfc68c6';
+const GATE_LS = 'bookshelf-of-memories/gate';
+const sha256 = async text => { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); };
+function gate() {
+  if (LS.get(GATE_LS) === GATE_HASH) return Promise.resolve();
+  document.body.classList.add('gated');
+  return new Promise(resolve => {
+    const input = el('input', { type: 'password', autocomplete: 'current-password', 'aria-label': 'Passphrase', placeholder: 'passphrase', autofocus: true });
+    const err = el('p', { class: 'err' });
+    const box = el('div', { class: 'gate' }, el('form', { onsubmit: async e => {
+      e.preventDefault();
+      const ok = crypto.subtle ? await sha256(input.value.trim().toLowerCase()) === GATE_HASH : false;
+      if (!ok) { err.textContent = crypto.subtle ? 'That is not it.' : 'Open this page over https.'; box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake'); input.select(); return; }
+      LS.set(GATE_LS, GATE_HASH); box.remove(); document.body.classList.remove('gated'); resolve();
+    } }, el('h1', {}, 'Bookshelf of Memories'), el('p', {}, 'This board is private. Enter the passphrase to open it.'), input, err, el('button', { class: 'btn', type: 'submit' }, 'Open')));
+    document.body.append(box); setTimeout(() => input.focus(), 50);
+  });
+}
+gate().then(boot);
 })();
 </script>
 </body>
